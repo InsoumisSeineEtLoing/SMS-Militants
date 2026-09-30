@@ -477,7 +477,9 @@
                 document.getElementById(`view-${v}`).className = (v === viewName) ? 'view-section active' : 'view-section';
                 document.getElementById(`nav-btn-${v}`).className = (v === viewName) ? 'drawer-nav-item active' : 'drawer-nav-item';
             });
-            toggleDrawer();
+            if(document.getElementById('side-drawer').classList.contains('open')) {
+                toggleDrawer();
+            }
             if(viewName === 'stats') renderDetailedStats();
             if(viewName === 'campaigns') renderCampaigns();
             if(viewName === 'templates') renderTemplates();
@@ -639,7 +641,7 @@
                 let activeCampBadge = '';
                 if(campaigns[eventId]) {
                     let totalM = campaigns[eventId].queue ? campaigns[eventId].queue.length : 0;
-                    activeCampBadge = `<div style="margin-top:6px;"><span class="tag bg-success" style="font-size:0.75rem;">📋 Campagne active (${totalM} militants)</span></div>`;
+                    activeCampBadge = `<div style="margin-top:6px;"><button onclick="goToCampaign('${eventId}')" class="tag bg-success" style="border:none; cursor:pointer; font-size:0.75rem; padding:5px 10px;">📋 Campagne active (${totalM} militants) — Cliquer pour voir</button></div>`;
                 }
 
                 html += `
@@ -652,6 +654,11 @@
             });
             html += '</div>';
             container.innerHTML = html;
+        }
+
+        function goToCampaign(eventId) {
+            switchView('campaigns');
+            // Optionnel : faire défiler ou mettre en évidence la campagne si besoin
         }
 
         let modalCachedEventData = null;
@@ -737,11 +744,11 @@
                 let m = militants[parseInt(cb.value)];
                 if(m) {
                     selectedMilitants.push({
-                        name: m.name,
+                        name: m.name || "",
                         lastname: m.lastname || "",
                         company: m.company || "",
                         city: m.city || "",
-                        phone: m.phone,
+                        phone: m.phone || "",
                         message: "",
                         status: 'À contacter',
                         sentAt: null,
@@ -1084,7 +1091,13 @@
                 return;
             }
 
-            militants.push({ name, lastname, company, city, phone }); 
+            militants.push({ 
+                name: name || "", 
+                lastname: lastname || "", 
+                company: company || "", 
+                city: city || "", 
+                phone: phone || "" 
+            }); 
             sortMilitants();
             document.getElementById('m-name').value=''; 
             document.getElementById('m-lastname').value=''; 
@@ -1207,7 +1220,13 @@
 
                     let exists = militants.some(m => cleanPhone(m.phone) === phone);
                     if (!exists) {
-                        militants.push({ name, lastname, company, city, phone });
+                        militants.push({ 
+                            name: name || "", 
+                            lastname: lastname || "", 
+                            company: company || "", 
+                            city: city || "", 
+                            phone: phone || "" 
+                        });
                         addedCount++;
                     } else {
                         dupCount++;
