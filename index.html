@@ -196,7 +196,6 @@
                 <button id="tab-past" onclick="switchTab('past')">📜 Historique / Passé</button>
             </div>
 
-            <!-- Sélecteur de période (calendrier) -->
             <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
                 <div style="flex:1;">
                     <label style="font-size: 0.8rem;">Filtrer du :</label>
@@ -216,7 +215,7 @@
         <!-- CONFIGURATION DES MESSAGES TYPES -->
         <div class="card">
             <h2>💬 Messages Types par Catégorie</h2>
-            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises disponibles : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
+            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong>. <br>Astuce : utilise <strong>{un_une}</strong> ou <strong>{le_la}</strong> pour que l'appli choisisse toute seule !</p>
             <div style="margin-bottom: 15px;">
                 <label>Catégorie :</label>
                 <select id="template-cat" style="background:#fff;">
@@ -225,7 +224,7 @@
                     <option value="reminder2">Relance 2</option>
                     <option value="rapel">Rappel (Veille d'événement)</option>
                 </select>
-                <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, dispo le {date} pour {action} ? Rdv {lieu}" style="margin-bottom:10px;">
+                <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, dispo pour {un_une} {action} le {date} ?" style="margin-bottom:10px;">
                 <button onclick="addTemplate()" class="btn-secondary" style="padding: 8px;">Ajouter à la catégorie</button>
             </div>
             <div id="templates-list-grouped"></div>
@@ -273,8 +272,8 @@
         const db = firebase.database();
 
         let templates = {
-            first: ["Salut {prenom}, dispo le {date} pour {action} ? Rdv {lieu}"],
-            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens au/à la {action} le {date} ?"],
+            first: ["Salut {prenom}, dispo pour {un_une} {action} le {date} ? Rdv {lieu}"],
+            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens à {le_la} {action} le {date} ?"],
             reminder2: ["Salut {prenom} ! On compte sur toi pour {action} le {date}, tu confirmes ta présence ?"],
             rapel: ["Rappel {prenom} : On se retrouve pour {action} le {date} à {lieu}. À très vite !"]
         };
@@ -319,10 +318,7 @@
         function renderGlobalStats() {
             const container = document.getElementById('global-stats-container');
             let totalCampaigns = Object.keys(campaigns).length;
-            let totalYes = 0;
-            let totalNo = 0;
-            let totalPending = 0;
-            let totalContacted = 0;
+            let totalYes = 0, totalNo = 0, totalPending = 0, totalContacted = 0;
 
             for (let id in campaigns) {
                 let camp = campaigns[id];
@@ -399,27 +395,17 @@
 
             let filteredEvents = calendarEvents.filter(ev => {
                 let evTime = ev.timestamp || 0;
-                
-                // Filtre par onglet (À venir vs Passé)
                 if (currentTab === 'upcoming' && evTime < todayTimestamp) return false;
                 if (currentTab === 'past' && evTime >= todayTimestamp) return false;
-
-                // Filtre par calendrier / période si renseigné
                 if (startTime && evTime < startTime) return false;
                 if (endTime && evTime > endTime) return false;
-
                 return true;
             });
 
-            // Tri : Chronologique pour le futur (du plus proche au plus lointain), Inversé pour le passé (du plus récent au plus ancien)
             filteredEvents.sort((a, b) => {
                 let tA = a.timestamp || 0;
                 let tB = b.timestamp || 0;
-                if (currentTab === 'upcoming') {
-                    return tA - tB; // Le plus proche en premier
-                } else {
-                    return tB - tA; // Le plus récent (ex: 2025/2024 proche) en premier
-                }
+                return (currentTab === 'upcoming') ? (tA - tB) : (tB - tA);
             });
 
             if(filteredEvents.length === 0) {
@@ -484,7 +470,6 @@
 
             for (let eventId in campaigns) {
                 let camp = campaigns[eventId];
-                
                 let stats = { oui: 0, non: 0, attente: 0, contacter: 0, relancer: 0, rappel: 0 };
                 let now = new Date().getTime();
                 
@@ -504,19 +489,13 @@
                     else if(item.status === 'Refus') stats.non++;
                     else if(item.status === 'En attente de réponse') {
                         stats.attente++;
-                        if(item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000)) {
-                            stats.relancer++;
-                        }
+                        if(item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000)) stats.relancer++;
                     }
                     else stats.contacter++;
-                    
-                    if(isTomorrow && item.status !== 'Refus') {
-                        stats.rappel++;
-                    }
+                    if(isTomorrow && item.status !== 'Refus') stats.rappel++;
                 });
 
                 let currentFilter = activeFilterStatus[eventId] || 'all';
-
                 let queueHtml = '';
                 let filteredQueue = camp.queue.filter(item => {
                     if (currentFilter === 'all') return true;
@@ -524,12 +503,8 @@
                     if (currentFilter === 'Refus') return item.status === 'Refus';
                     if (currentFilter === 'En attente de réponse') return item.status === 'En attente de réponse';
                     if (currentFilter === 'À contacter') return item.status === 'À contacter';
-                    if (currentFilter === 'relancer') {
-                        return item.status === 'En attente de réponse' && item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000);
-                    }
-                    if (currentFilter === 'rappel') {
-                        return isTomorrow && item.status !== 'Refus';
-                    }
+                    if (currentFilter === 'relancer') return item.status === 'En attente de réponse' && item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000);
+                    if (currentFilter === 'rappel') return isTomorrow && item.status !== 'Refus';
                     return true;
                 });
 
@@ -635,9 +610,38 @@
             const camp = campaigns[eventId];
             const item = camp.queue[index];
 
+            let actionName = camp.name;
+            let firstChar = actionName.trim().charAt(0).toLowerCase();
+            let isVowel = ['a', 'e', 'i', 'o', 'u', 'y', 'h', 'é', 'è', 'ê'].includes(firstChar);
+
+            // Gestion automatique des articles un/une, le/la
+            let unUne = isVowel ? "un" : (actionName.toLowerCase().startsWith("assemblée") || actionName.toLowerCase().startsWith("réunion") || actionName.toLowerCase().startsWith("manifestation") ? "une" : "un");
+            // Ajustement plus fin : si le mot commence par une voyelle, souvent c'est "un" mais avec élision. Ici on simplifie :
+            let unUneForm = isVowel ? "d'" + actionName : unUne + " " + actionName;
+            
+            // Articles définis (le/la vs l')
+            let leLa = isVowel ? "l'" + actionName : "le " + actionName;
+
             let msg = randomTpl
                 .replace(/{prenom}/g, item.name)
-                .replace(/{action}/g, camp.name)
+                .replace(/{action}/g, actionName)
+                .replace(/{un_une}/g, isVowel ? "un" : "un") // ou gère dynamiquement selon la formulation
+                .replace(/{le_la}/g, leLa)
+                .replace(/{date}/g, camp.date)
+                .replace(/{lieu}/g, camp.location || "le lieu habituel");
+
+            // Option simple et magique pour {un_une} et {le_la} :
+            msg = msg.replace(/un_une/g, isVowel ? "d'" : "un ");
+            
+            // Logique propre d'accord automatique
+            let articleUnUne = isVowel ? "d'" : "un ";
+            let articleLeLa = isVowel ? "l'" : "le ";
+            
+            msg = randomTpl
+                .replace(/{prenom}/g, item.name)
+                .replace(/{action}/g, actionName)
+                .replace(/{un_une}/g, isVowel ? "d'" : "un")
+                .replace(/{le_la}/g, isVowel ? "l'" : "le")
                 .replace(/{date}/g, camp.date)
                 .replace(/{lieu}/g, camp.location || "le lieu habituel");
 
