@@ -164,11 +164,20 @@
 
     <div class="container">
 
-        <!-- ÉVÉNEMENTS GOOGLE AGENDA INTÉGRÉS -->
+        <!-- ÉVÉNEMENTS DE L'AGENDA AVEC FILTRES DE TRI -->
         <div class="card">
             <h2>📅 Événements de l'Agenda</h2>
+            
+            <!-- Options de filtrage -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="filter-mode" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem; background: #fff;">
+                    <option value="upcoming">⏳ Actions à venir (Futur)</option>
+                    <option value="all">📜 Tout l'historique</option>
+                </select>
+            </div>
+
             <div id="calendar-events-container">
-                <p style="font-size:0.85rem; color: var(--gray);">Chargement des événements de l'agenda...</p>
+                <p style="font-size:0.85rem; color: var(--gray);">Chargement des événements...</p>
             </div>
         </div>
 
@@ -220,7 +229,6 @@
     </div>
 
     <script>
-        // Initialisation de Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCRWuB4zYxG5aKsrSFh2F0Uow51SzB0bZQ",
             authDomain: "sms-militants.firebaseapp.com",
@@ -235,9 +243,6 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Lien iCal intégré directement en dur dans le code
-        const ICAL_URL = "https://calendar.google.com/calendar/ical/insoumisud77%40gmail.com/private-b6531feaa35f54f9ad3a951bd85b07cb/basic.ics";
-
         let templates = [
             "Salut {prenom} ! Serais-tu dispo pour le/la {action} {date} ?",
             "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?"
@@ -246,10 +251,10 @@
         let campaignQueue = [];
         let calendarEvents = [];
 
-        // Synchronisation Realtime Firebase
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
         db.ref('queue').on('value', (snap) => { if(snap.val()) { campaignQueue = snap.val(); renderQueue(); } });
+        db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendarEvents(); } });
 
         function saveData() {
             db.ref('templates').set(templates);
@@ -259,7 +264,6 @@
         }
 
         function renderUI() {
-            // Templates
             const tContainer = document.getElementById('templates-list');
             tContainer.innerHTML = '';
             templates.forEach((t, index) => {
@@ -270,7 +274,6 @@
                     </div>`;
             });
 
-            // Militants
             const mContainer = document.getElementById('militants-ul');
             mContainer.innerHTML = '';
             militants.forEach((m, index) => {
@@ -285,67 +288,35 @@
                 document.getElementById('campaign-card').style.display = 'block';
                 renderQueue();
             }
-        }
-
-        // Chargement automatique de l'agenda en arrière-plan via proxy
-        function loadEmbeddedCalendar() {
-            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(ICAL_URL);
-            fetch(proxyUrl)
-                .then(res => res.text())
-                .then(icsText => {
-                    calendarEvents = parseICS(icsText);
-                    renderCalendarEvents();
-                })
-                .catch(err => {
-                    console.error("Erreur chargement agenda", err);
-                    document.getElementById('calendar-events-container').innerHTML = '<p style="font-size:0.85rem; color:var(--danger);">Impossible de charger les événements de l\'agenda.</p>';
-                });
-        }
-
-        // Parseur ICS
-        function parseICS(icsData) {
-            let events = [];
-            let lines = icsData.split(/\r\n|\n|\r/);
-            let currentEvent = null;
-
-            for (let line of lines) {
-                if (line === "BEGIN:VEVENT") {
-                    currentEvent = {};
-                } else if (line === "END:VEVENT" && currentEvent) {
-                    if (currentEvent.summary) events.push(currentEvent);
-                    currentEvent = null;
-                } else if (currentEvent) {
-                    if (line.startsWith("SUMMARY:")) {
-                        currentEvent.summary = line.substring(8);
-                    } else if (line.startsWith("DTSTART")) {
-                        let parts = line.split(":");
-                        let rawDate = parts[parts.length - 1];
-                        currentEvent.date = formatICSDate(rawDate);
-                    }
-                }
-            }
-            return events.slice(0, 15); // Limite aux 15 prochains événements
-        }
-
-        function formatICSDate(str) {
-            if (str.length >= 8) {
-                let year = str.substring(0, 4);
-                let month = str.substring(4, 6);
-                let day = str.substring(6, 8);
-                return `${day}/${month}/${year}`;
-            }
-            return str;
+            renderCalendarEvents();
         }
 
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
-            if(calendarEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement trouvé dans l\'agenda.</p>';
+            if(!calendarEvents || calendarEvents.length === 0) {
+                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement enregistré.</p>';
                 return;
             }
+
+            const filterMode = document.getElementById('filter-mode').value;
+            const nowTime = new Date().getTime();
+
+            // Filtrage selon le mode sélectionné
+            let filteredEvents = calendarEvents.filter(ev => {
+                if (filterMode === 'upcoming') {
+                    // Garde uniquement les événements dont le timestamp est futur (ou supérieur à aujourd'hui)
+                    return ev.timestamp && ev.timestamp >= nowTime;
+                }
+                return true; // 'all'
+            });
+
+            if(filteredEvents.length === 0) {
+                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucune action à venir trouvée.</p>';
+                return;
+            }
+
             container.innerHTML = '';
-            calendarEvents.forEach((ev) => {
-                // Échappement propre pour éviter les bugs de guillemets dans les titres
+            filteredEvents.forEach((ev) => {
                 const safeSummary = ev.summary.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 container.innerHTML += `
                     <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:10px; border-radius:6px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
@@ -388,7 +359,6 @@
 
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); }
 
-        // Import CSV
         function importCSV(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -472,7 +442,7 @@
 
         function markAsSent(index) {
             const now = new Date();
-            campaignQueue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR',forOptions = {hour: '2-digit', minute:'2-digit'});
+            campaignQueue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
             if(campaignQueue[index].status === 'En attente') {
                 campaignQueue[index].status = 'En attente de réponse';
             }
@@ -485,7 +455,6 @@
         }
 
         renderUI();
-        loadEmbeddedCalendar(); // Lancement du chargement de l'agenda au démarrage
     </script>
 </body>
 </html>
