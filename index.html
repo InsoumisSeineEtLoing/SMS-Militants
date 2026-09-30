@@ -18,6 +18,7 @@
             --danger: #e53e3e;
             --warning: #d69e2e;
             --info: #3182ce;
+            --purple: #805ad5;
         }
 
         body {
@@ -189,6 +190,7 @@
         .bg-success { background-color: var(--success); }
         .bg-danger { background-color: var(--danger); }
         .bg-warning { background-color: var(--warning); }
+        .bg-purple { background-color: var(--purple); }
         .bg-gray { background-color: var(--gray); }
         .bg-info { background-color: var(--info); }
 
@@ -224,7 +226,10 @@
             font-weight: bold;
             margin-right: 5px;
             margin-top: 5px;
+            cursor: pointer;
+            border: 1px solid transparent;
         }
+        .stats-badge:hover { border-color: var(--gray); }
         
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
         .nav-tabs button {
@@ -351,6 +356,13 @@
                     <button id="tab-camp-current" class="active" onclick="switchCampaignTab('current')">🔥 En cours</button>
                     <button id="tab-camp-past" onclick="switchCampaignTab('past')">📁 Passées</button>
                 </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; background: #f8fafc; padding: 8px 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <label style="font-size: 0.8rem; margin:0;">Trier par date :</label>
+                    <select id="campaign-sort-order" onchange="renderCampaigns()" style="width: auto; margin-bottom: 0; font-size: 0.8rem; background: #fff; padding: 4px 8px;">
+                        <option value="asc">📅 De la plus ancienne à la plus récente</option>
+                        <option value="desc">📅 De la plus récente à la plus ancienne</option>
+                    </select>
+                </div>
                 <div id="campaigns-container"></div>
             </div>
         </div>
@@ -459,7 +471,11 @@
         let militants = [];
         let campaigns = {};
         let calendarEvents = [];
-        let activeFilterStatus = {};
+        
+        let activeCampaignFilters = {}; // eventId -> statut filtré ('all', 'Participe', 'Peut-être', 'Refus', etc.)
+        let activeCampaignSorts = {};   // eventId -> tri ('name', 'status', 'sent')
+        let expandedCampaigns = {};    // eventId -> boolean (ouvert/fermé)
+
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
         let currentStatTab = 'date';
@@ -691,9 +707,11 @@
 
         function goToCampaign(eventId) {
             switchView('campaigns');
+            expandedCampaigns[eventId] = true;
+            renderCampaigns();
         }
 
-        // --- GESTION DE LA MODALE EN 2 ETAPES PROPRE ---
+        // --- GESTION DE LA MODALE EN 2 ETAPES ---
         function openMilitantModalForEvent(eventId, actionName, actionDate, rawDateStr, actionLocation, timestamp) {
             if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
             modalTargetEventId = eventId;
@@ -760,7 +778,6 @@
             if(!container) return;
 
             let filter = searchInput ? searchInput.value.toLowerCase() : '';
-
             let selectedTags = [];
             document.querySelectorAll('.modal-tag-checkbox:checked').forEach(cb => selectedTags.push(cb.value));
 
@@ -840,19 +857,23 @@
 
             saveData();
             closeMilitantModal();
+            expandedCampaigns[modalTargetEventId] = true;
             switchView('campaigns');
         }
 
-        function saveCampaignDetails(eventId) {
-            const newName = document.getElementById(`camp_name_${eventId}`).value.trim();
-            const newDate = document.getElementById(`camp_date_${eventId}`).value.trim();
-            const newLocation = document.getElementById(`camp_loc_${eventId}`).value.trim();
-            if(campaigns[eventId]) {
-                campaigns[eventId].name = newName || campaigns[eventId].name;
-                campaigns[eventId].date = newDate || campaigns[eventId].date;
-                campaigns[eventId].location = newLocation;
-                saveData(); alert("Modifications enregistrées !"); renderCampaigns();
-            }
+        function toggleCampaignAccordion(eventId) {
+            expandedCampaigns[eventId] = !expandedCampaigns[eventId];
+            renderCampaigns();
+        }
+
+        function filterCampaignStatus(eventId, status) {
+            activeCampaignFilters[eventId] = status;
+            renderCampaigns();
+        }
+
+        function sortCampaignQueue(eventId, sortBy) {
+            activeCampaignSorts[eventId] = sortBy;
+            renderCampaigns();
         }
 
         function renderCampaigns() {
@@ -866,10 +887,9 @@
             }
 
             const now = new Date().getTime();
-            let count = 0;
+            let sortOrder = document.getElementById('campaign-sort-order')?.value || 'asc';
 
-            for (let eventId in campaigns) {
-                let camp = campaigns[eventId];
+            let campEntries = Object.entries(campaigns).map(([id, camp]) => {
                 let isPast = false;
                 if(camp.timestamp && camp.timestamp < now) isPast = true;
                 else if(camp.rawDate) {
@@ -879,94 +899,138 @@
                         if(evDate.getTime() < new Date().setHours(0,0,0,0)) isPast = true;
                     }
                 }
+                return { id, camp, isPast, timestamp: camp.timestamp || 0 };
+            });
 
-                if(currentCampTab === 'current' && isPast) continue;
-                if(currentCampTab === 'past' && !isPast) continue;
+            // Tri par date
+            campEntries.sort((a, b) => {
+                return sortOrder === 'asc' ? (a.timestamp - b.timestamp) : (b.timestamp - a.timestamp);
+            });
+
+            let count = 0;
+
+            campEntries.forEach(({ id: eventId, camp, isPast }) => {
+                if(currentCampTab === 'current' && isPast) return;
+                if(currentCampTab === 'past' && !isPast) return;
                 count++;
 
-                let stats = { oui: 0, non: 0, attente: 0, contacter: 0 };
+                let stats = { oui: 0, non: 0, peutetre: 0, attente: 0, contacter: 0 };
                 let queueList = camp.queue || [];
                 queueList.forEach(item => {
                     if(item.status === 'Participe') stats.oui++;
                     else if(item.status === 'Refus') stats.non++;
+                    else if(item.status === 'Peut-être') stats.peutetre++;
                     else if(item.status === 'En attente de réponse') stats.attente++;
                     else stats.contacter++;
                 });
 
-                let currentFilter = activeFilterStatus[eventId] || 'all';
-                let queueHtml = '';
-                queueList.filter(item => currentFilter === 'all' || item.status === currentFilter).forEach((item) => {
-                    let realIndex = queueList.indexOf(item);
-                    let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info'));
-                    const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
-                    const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
-                    const cityStr = item.city ? ` (${item.city})` : '';
+                let isExpanded = !!expandedCampaigns[eventId];
+                let currentFilter = activeCampaignFilters[eventId] || 'all';
+                let currentSort = activeCampaignSorts[eventId] || 'name';
 
-                    let templateOptions = '';
-                    for (let cat in templates) {
-                        let cLabel = templates[cat]?.label || cat;
-                        templateOptions += `<option value="${cat}">${cLabel}</option>`;
-                    }
-
-                    queueHtml += `
-                        <div class="sms-item">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
-                                <div style="display:flex; align-items:center; gap:5px;">
-                                    <span class="tag ${badgeClass}">${item.status}</span>
-                                    <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
-                                </div>
-                            </div>
-                            <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
-                            <div style="display:flex; gap:5px; margin-bottom:8px;">
-                                <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
-                                <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
-                            </div>
-                            <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
-                            <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
-                            <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ Attente</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
-                            </div>
-                        </div>`;
+                // Filtrage de la file d'attente
+                let filteredQueue = queueList.filter(item => {
+                    if (currentFilter === 'all') return true;
+                    return item.status === currentFilter;
                 });
+
+                // Tri de la file d'attente
+                filteredQueue.sort((a, b) => {
+                    if (currentSort === 'name') {
+                        let nameA = `${a.name} ${a.lastname || ''}`.toLowerCase();
+                        let nameB = `${b.name} ${b.lastname || ''}`.toLowerCase();
+                        return nameA.localeCompare(nameB);
+                    } else if (currentSort === 'status') {
+                        return (a.status || '').localeCompare(b.status || '');
+                    } else if (currentSort === 'sent') {
+                        return (b.lastSentTimestamp || 0) - (a.lastSentTimestamp || 0);
+                    }
+                    return 0;
+                });
+
+                let queueHtml = '';
+                if(isExpanded) {
+                    filteredQueue.forEach((item) => {
+                        let realIndex = queueList.indexOf(item);
+                        let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                        const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+                        const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
+                        const cityStr = item.city ? ` (${item.city})` : '';
+
+                        let templateOptions = '';
+                        for (let cat in templates) {
+                            let cLabel = templates[cat]?.label || cat;
+                            templateOptions += `<option value="${cat}">${cLabel}</option>`;
+                        }
+
+                        queueHtml += `
+                            <div class="sms-item">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <span class="tag ${badgeClass}">${item.status}</span>
+                                        <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
+                                    </div>
+                                </div>
+                                <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
+                                <div style="display:flex; gap:5px; margin-bottom:8px;">
+                                    <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
+                                    <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
+                                </div>
+                                <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
+                                <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
+                                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ Attente</button>
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
+                                </div>
+                            </div>`;
+                    });
+                }
 
                 container.innerHTML += `
                     <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
-                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; cursor:pointer;" onclick="toggleCampaignAccordion('${eventId}')">
                             <div>
-                                <h3 style="margin:0; color:var(--primary-dark); font-size:1.1rem;">${camp.name}</h3>
+                                <h3 style="margin:0; color:var(--primary-dark); font-size:1.1rem;">${camp.name} ${isExpanded ? '▲' : '▼'}</h3>
                                 <div style="font-size:0.85rem; color:var(--gray); margin-top:2px; font-weight: 600;">📅 ${camp.date}</div>
                                 <div style="font-size:0.8rem; color:var(--gray);">📍 ${camp.location || 'Lieu non spécifié'}</div>
                             </div>
                             <span class="tag ${isPast ? 'bg-gray' : 'bg-success'}" style="font-size:0.75rem; padding:5px 10px;">${isPast ? 'Passée' : 'En cours'}</span>
                         </div>
-                        <div style="display:flex; gap:10px; margin-top:8px;">
-                            <button onclick="openAddMilitantsToCampaign('${eventId}')" class="btn-secondary" style="font-size:0.75rem; padding:4px 8px; background:var(--info);">➕ Ajouter des militants</button>
-                            <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.75rem;">Supprimer campagne</button>
+
+                        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px;">
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'all')" style="background:${currentFilter==='all'?'#cbd5e0':'#edf2f7'};">📋 Total : ${queueList.length}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Participe')" style="background:${currentFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${stats.oui}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Peut-être')" style="background:${currentFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${stats.peutetre}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Refus')" style="background:${currentFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${stats.non}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'En attente de réponse')" style="background:${currentFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'À contacter')" style="background:${currentFilter==='À contacter'?'#e2e8f0':'#f7fafc'}; color:#4a5568;">🔄 À contacter : ${stats.contacter}</span>
                         </div>
 
-                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin: 10px 0;">
-                            <label style="font-size:0.75rem; color:var(--gray);">Modifier le titre :</label>
-                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" style="margin-bottom:6px; font-size:0.85rem; background:#fff;">
-                            <div style="display:flex; gap:10px; margin-bottom:6px;">
-                                <div style="flex:1;"><label style="font-size:0.7rem; color:var(--gray);">Date :</label><input type="text" id="camp_date_${eventId}" value="${camp.date}" style="margin-bottom:0; font-size:0.8rem; background:#fff;"></div>
-                                <div style="flex:1;"><label style="font-size:0.7rem; color:var(--gray);">Lieu :</label><input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" style="margin-bottom:0; font-size:0.8rem; background:#fff;"></div>
+                        ${isExpanded ? `
+                            <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
+                                    <div style="display:flex; gap:10px;">
+                                        <button onclick="openAddMilitantsToCampaign('${eventId}')" class="btn-secondary" style="font-size:0.75rem; padding:6px 10px; background:var(--info);">➕ Ajouter des militants</button>
+                                        <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.75rem;">Supprimer campagne</button>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:5px;">
+                                        <label style="font-size:0.75rem; margin:0;">Trier militants :</label>
+                                        <select onchange="sortCampaignQueue('${eventId}', this.value)" style="width:auto; margin-bottom:0; font-size:0.75rem; background:#fff; padding:4px;">
+                                            <option value="name" ${currentSort==='name'?'selected':''}>Par nom</option>
+                                            <option value="status" ${currentSort==='status'?'selected':''}>Par statut</option>
+                                            <option value="sent" ${currentSort==='sent'?'selected':''}>Par date d'envoi</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant pour ce filtre.</p>'}</div>
                             </div>
-                            <button onclick="saveCampaignDetails('${eventId}')" class="btn-secondary" style="padding: 4px; font-size: 0.75rem; background: var(--info);">💾 Enregistrer</button>
-                        </div>
-                        
-                        <div style="margin-bottom:10px;">
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${stats.oui}</span>
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${stats.non}</span>
-                            <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
-                        </div>
-
-                        <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant dans cette campagne. Clique sur "Ajouter des militants" pour en inclure.</p>'}</div>
+                        ` : ''}
                     </div>`;
-            }
+            });
             if(count === 0) container.innerHTML = `<p style="font-size:0.85rem; color: var(--gray);">Aucune campagne ${currentCampTab === 'current' ? 'en cours' : 'passée'}.</p>`;
         }
 
@@ -1025,25 +1089,27 @@
                     if(parts.length === 3) targetDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
                 }
 
-                let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
+                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalContacted = 0, html = '';
                 Object.values(campaigns).forEach(camp => {
                     if (targetDateFormatted && !camp.date.includes(targetDateFormatted)) return;
-                    let cYes = 0, cNo = 0, rows = '';
+                    let cYes = 0, cMaybe = 0, cNo = 0, rows = '';
                     if (camp.queue) {
                         camp.queue.forEach(item => {
                             if(item.sentAt) totalContacted++;
                             if(item.status === 'Participe') { cYes++; totalYes++; }
+                            else if(item.status === 'Peut-être') { cMaybe++; totalMaybe++; }
                             else if(item.status === 'Refus') { cNo++; totalNo++; }
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : 'bg-warning'));
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📅 Date : ${camp.date} — ${camp.name}</h3>
-                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
+                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
                         <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
                     </div>`;
                 });
-                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Total Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Total Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS Contactés : ${totalContacted}</span>`;
+                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS Contactés : ${totalContacted}</span>`;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette date.</p>';
             }
 
@@ -1056,26 +1122,28 @@
                 selectHtml += `</select>`;
                 inputWrapper.innerHTML = selectHtml;
 
-                let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
+                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalContacted = 0, html = '';
                 for (let id in campaigns) {
                     if(currentSelected !== 'all' && currentSelected !== id) continue;
                     let camp = campaigns[id];
-                    let cYes = 0, cNo = 0, rows = '';
+                    let cYes = 0, cMaybe = 0, cNo = 0, rows = '';
                     if(camp.queue) {
                         camp.queue.forEach(item => {
                             if(item.sentAt) totalContacted++;
                             if(item.status === 'Participe') { cYes++; totalYes++; }
+                            else if(item.status === 'Peut-être') { cMaybe++; totalMaybe++; }
                             else if(item.status === 'Refus') { cNo++; totalNo++; }
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : 'bg-warning'));
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 Action : ${camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
-                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
+                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
                         <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
                     </div>`;
                 }
-                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>`;
+                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>`;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
             }
 
@@ -1094,7 +1162,7 @@
                     if (currentSelected !== 'all' && currentSelected !== m.phone) return;
                     let mPhoneClean = cleanPhone(m.phone);
                     let historyRows = '';
-                    let mYes = 0, mNo = 0, mParticipations = 0;
+                    let mYes = 0, mMaybe = 0, mNo = 0, mParticipations = 0;
 
                     Object.values(campaigns).forEach(camp => {
                         if (camp.queue) {
@@ -1102,10 +1170,12 @@
                                 if (cleanPhone(item.phone) === mPhoneClean) {
                                     mParticipations++;
                                     if (item.status === 'Participe') mYes++;
-                                    if (item.status === 'Refus') mNo++;
+                                    else if (item.status === 'Peut-être') mMaybe++;
+                                    else if (item.status === 'Refus') mNo++;
+                                    let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : 'bg-warning'));
                                     historyRows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
                                         <td style="padding:6px;"><strong>${camp.name}</strong><br><span style="color:var(--gray); font-size:0.75rem;">${camp.date}</span></td>
-                                        <td style="padding:6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td>
+                                        <td style="padding:6px;"><span class="tag ${badgeClass}">${item.status}</span></td>
                                         <td style="padding:6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
                                     </tr>`;
                                 }
@@ -1121,8 +1191,9 @@
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">👤 ${mDisplayName}${compBadge}${cityStr} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${m.phone})</span></h3>
                         <div style="margin-bottom:8px;">
                             <span class="stats-badge">📌 Actions : ${mParticipations}</span>
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Participations : ${mYes}</span>
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Refus : ${mNo}</span>
+                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${mYes}</span>
+                            <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${mMaybe}</span>
+                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${mNo}</span>
                         </div>
                         ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce militant.</p>'}
                     </div>`;
