@@ -197,6 +197,7 @@
         <!-- CONFIGURATION DES MESSAGES TYPES PAR CATÉGORIE -->
         <div class="card">
             <h2>💬 Messages Types par Catégorie</h2>
+            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Utilise les balises exactes : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
             <div style="margin-bottom: 15px;">
                 <label>Catégorie :</label>
                 <select id="template-cat" style="background:#fff;">
@@ -205,7 +206,7 @@
                     <option value="reminder2">Relance 2</option>
                     <option value="rapel">Rappel (Veille d'événement)</option>
                 </select>
-                <input type="text" id="new-template" placeholder="Ex: Salut {prenom} ! Dispo pour {action} le {date} ?" style="margin-bottom:10px;">
+                <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, dispo le {date} pour {action} ? Rdv {lieu}" style="margin-bottom:10px;">
                 <button onclick="addTemplate()" class="btn-secondary" style="padding: 8px;">Ajouter à la catégorie</button>
             </div>
             <div id="templates-list-grouped"></div>
@@ -253,15 +254,15 @@
         const db = firebase.database();
 
         let templates = {
-            first: ["Salut {prenom} ! Serais-tu dispo pour le/la {action} le {date} ?"],
-            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens au/à la {action} {date} ?"],
-            reminder2: ["Salut {prenom} ! On compte sur toi pour {action} {date}, tu confirmes ta présence ?"],
-            rapel: ["Rappel {prenom} : On se retrouve pour {action} {date}. À très vite !"]
+            first: ["Salut {prenom}, dispo le {date} pour {action} ? Rdv {lieu}"],
+            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens au/à la {action} le {date} ?"],
+            reminder2: ["Salut {prenom} ! On compte sur toi pour {action} le {date}, tu confirmes ta présence ?"],
+            rapel: ["Rappel {prenom} : On se retrouve pour {action} le {date} à {lieu}. À très vite !"]
         };
         let militants = [];
-        let campaigns = {}; // Stocke les files d'attente par ID d'événement
+        let campaigns = {};
         let calendarEvents = [];
-        let activeFilterStatus = {}; // Pour stocker le filtre de statut par campagne
+        let activeFilterStatus = {};
 
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
@@ -335,18 +336,19 @@
             const todayTimestamp = today.getTime();
 
             let filteredEvents = calendarEvents.filter(ev => {
-                if (!ev.timestamp) return true; // Sécurité si timestamp absent
+                // Si l'événement a un timestamp valide, on compare
+                let evTime = ev.timestamp || 0;
                 if (filterMode === 'upcoming') {
-                    return ev.timestamp >= todayTimestamp;
+                    return evTime >= todayTimestamp;
                 } else if (filterMode === 'range') {
                     const startStr = document.getElementById('filter-start').value;
                     const endStr = document.getElementById('filter-end').value;
                     let matches = true;
-                    if (startStr && ev.timestamp < new Date(startStr).setHours(0,0,0,0)) matches = false;
-                    if (endStr && ev.timestamp > new Date(endStr).setHours(23,59,59,999)) matches = false;
+                    if (startStr && evTime < new Date(startStr).setHours(0,0,0,0)) matches = false;
+                    if (endStr && evTime > new Date(endStr).setHours(23,59,59,999)) matches = false;
                     return matches;
                 }
-                return true;
+                return true; // 'all'
             });
 
             if(filteredEvents.length === 0) {
@@ -358,29 +360,30 @@
             filteredEvents.forEach((ev, idx) => {
                 const safeSummary = (ev.summary || 'Action militante').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const dateTimeStr = ev.time ? `${ev.date} à ${ev.time}` : ev.date;
-                const locationStr = ev.location ? `📍 ${ev.location}` : '';
+                const locationStr = ev.location || 'Lieu non spécifié';
+                const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const eventId = "ev_" + idx;
 
                 container.innerHTML += `
                     <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:8px; margin-bottom:10px;">
                         <div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${ev.summary}</div>
                         <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">
-                            📅 ${dateTimeStr} ${locationStr ? '<br>' + locationStr : ''}
+                            📅 ${dateTimeStr} <br>📍 ${locationStr}
                         </div>
-                        <button onclick="initCampaign('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}')" style="padding:8px 12px; font-size:0.85rem;">📂 Gérer / Lancer la campagne SMS</button>
+                        <button onclick="initCampaign('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}')" style="padding:8px 12px; font-size:0.85rem;">📂 Gérer / Lancer la campagne SMS</button>
                     </div>`;
             });
         }
 
-        function initCampaign(eventId, actionName, actionDate, rawDateStr) {
+        function initCampaign(eventId, actionName, actionDate, rawDateStr, actionLocation) {
             if(militants.length === 0) { alert("Ajoute d'abord des militants dans ton carnet !"); return; }
             
-            // Si la campagne n'existe pas encore pour cet événement, on l'initialise
             if(!campaigns[eventId]) {
                 campaigns[eventId] = {
                     name: actionName,
                     date: actionDate,
                     rawDate: rawDateStr,
+                    location: actionLocation,
                     queue: militants.map(m => ({
                         name: m.name,
                         lastname: m.lastname || "",
@@ -410,11 +413,9 @@
             for (let eventId in campaigns) {
                 let camp = campaigns[eventId];
                 
-                // Calcul des statistiques
                 let stats = { oui: 0, non: 0, attente: 0, contacter: 0, relancer: 0, rappel: 0 };
                 let now = new Date().getTime();
                 
-                // Vérification si la date de l'événement est demain (pour l'alerte rappel)
                 let isTomorrow = false;
                 if(camp.rawDate) {
                     let parts = camp.rawDate.split('/');
@@ -431,7 +432,6 @@
                     else if(item.status === 'Refus') stats.non++;
                     else if(item.status === 'En attente de réponse') {
                         stats.attente++;
-                        // Alerte À relancer si pas de réponse depuis plus de 2 jours (172800000 ms)
                         if(item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000)) {
                             stats.relancer++;
                         }
@@ -461,8 +461,8 @@
                     return true;
                 });
 
-                filteredQueue.forEach((item, index) => {
-                    let realIndex = camp.queue.indexOf(item); // Index réel dans le tableau complet
+                filteredQueue.forEach((item) => {
+                    let realIndex = camp.queue.indexOf(item);
                     let badgeClass = 'bg-gray';
                     if(item.status === 'Participe') badgeClass = 'bg-success';
                     if(item.status === 'Refus') badgeClass = 'bg-danger';
@@ -484,7 +484,6 @@
                             
                             <div class="message-preview">"${item.message || '(Aucun message généré - Choisis une catégorie ci-dessous)'}"</div>
                             
-                            <!-- Sélecteur de catégorie pour générer le message -->
                             <div style="display:flex; gap:5px; margin-bottom:8px;">
                                 <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">
                                     <option value="first">1er message</option>
@@ -517,19 +516,17 @@
                             <span>${camp.name}</span>
                             <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.8rem;">Supprimer campagne</button>
                         </h3>
-                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:10px;">📅 ${camp.date}</div>
+                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:10px;">📅 ${camp.date} | 📍 ${camp.location || 'Lieu non spécifié'}</div>
                         
-                        <!-- Statistiques -->
                         <div style="margin-bottom:12px;">
                             <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${stats.oui}</span>
                             <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${stats.non}</span>
                             <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
                             <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">🔄 À contacter : ${stats.contacter}</span>
-                            ${stats.relancer > fn_dummy() ? `<span class="stats-badge" style="background:#fed7d7; color:#9b2c2c;">⚠️ À relancer : ${stats.relancer}</span>` : ''}
+                            ${stats.relancer > 0 ? `<span class="stats-badge" style="background:#fed7d7; color:#9b2c2c;">⚠️ À relancer : ${stats.relancer}</span>` : ''}
                             ${stats.rappel > 0 ? `<span class="stats-badge" style="background:#feebc8; color:#c05621;">⏰ Rappel : ${stats.rappel}</span>` : ''}
                         </div>
 
-                        <!-- Filtre par statut -->
                         <div style="margin-bottom: 12px;">
                             <label style="font-size:0.8rem;">Filtrer l'affichage :</label>
                             <select onchange="filterCampaignStatus('${eventId}', this.value)" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
@@ -548,8 +545,6 @@
                 `;
             }
         }
-
-        function fn_dummy() { return 0; }
 
         function filterCampaignStatus(eventId, status) {
             activeFilterStatus[eventId] = status;
@@ -571,7 +566,8 @@
             let msg = randomTpl
                 .replace(/{prenom}/g, item.name)
                 .replace(/{action}/g, camp.name)
-                .replace(/{date}/g, camp.date);
+                .replace(/{date}/g, camp.date)
+                .replace(/{lieu}/g, camp.location || "le lieu habituel");
 
             campaigns[eventId].queue[index].message = msg;
             saveData();
