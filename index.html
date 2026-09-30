@@ -311,7 +311,7 @@
 
             <div id="modal-step-militants" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅️️ Retour aux tags</button>
+                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅ Retour aux tags</button>
                     <div style="display: flex; gap: 6px;">
                         <button onclick="toggleSelectAllMilitants(true)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout cocher</button>
                         <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout décocher</button>
@@ -504,16 +504,7 @@
         db.ref('calendarEvents').on('value', (snap) => { 
             if(snap.val()) { 
                 let rawEvents = snap.val();
-                // Correction locale du décalage horaire UTC -> Heure locale française (+2h en été)
-                calendarEvents = rawEvents.map(ev => {
-                    let fixedEv = { ...ev };
-                    if (fixedEv.timestamp) {
-                        // Ajustement du timestamp si l'événement était décalé en UTC pur
-                        let d = new Date(fixedEv.timestamp);
-                        // Si l'heure affichée diffère, on recale proprement
-                    }
-                    return fixedEv;
-                });
+                calendarEvents = rawEvents.map(ev => ({ ...ev }));
                 renderCalendarEvents(); 
             } 
         });
@@ -528,8 +519,7 @@
             militants.sort((a, b) => {
                 let nameA = (a.name || "").toLowerCase();
                 let nameB = (b.name || "").toLowerCase();
-                if (nameA < nameB) return -1;
-                if (nameA > nameB) return 1;
+                if (nameA !== nameB) return nameA.localeCompare(nameB);
                 let lastA = (a.lastname || "").toLowerCase();
                 let lastB = (b.lastname || "").toLowerCase();
                 return lastA.localeCompare(lastB);
@@ -678,7 +668,7 @@
                 return;
             }
 
-            const now = new Date().getTime(); // Heure exacte actuelle pour comparaison précise
+            const now = new Date().getTime(); 
             const startStr = document.getElementById('filter-start').value;
             const endStr = document.getElementById('filter-end').value;
             let startTime = startStr ? new Date(startStr).setHours(0,0,0,0) : null;
@@ -686,9 +676,6 @@
 
             let filteredEvents = calendarEvents.filter(ev => {
                 let evTime = ev.timestamp || 0;
-                
-                // Correction du décalage horaire UTC si nécessaire (ajout de 2h en millisecondes si stocké en UTC pur)
-                // On utilise l'heure exacte (now) pour départager passé / à venir
                 if (currentTab === 'upcoming' && evTime < now) return false;
                 if (currentTab === 'past' && evTime >= now) return false;
                 if (startTime && evTime < startTime) return false;
@@ -706,13 +693,10 @@
             let html = '<div class="events-scroll-box">';
             filteredEvents.forEach((ev, idx) => {
                 const safeSummary = (ev.summary || 'Action').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                
-                // Correction d'affichage de l'heure locale (+2h si l'heure brute stockée est en UTC)
                 let displayDateStr = ev.date;
                 let displayTimeStr = ev.time || '';
                 if(ev.timestamp) {
                     let d = new Date(ev.timestamp);
-                    // S'assurer que l'heure affichée reflète l'heure locale française
                     let hours = d.getHours().toString().padStart(2, '0');
                     let minutes = d.getMinutes().toString().padStart(2, '0');
                     if(ev.time) displayTimeStr = `${hours}h${minutes}`;
@@ -926,7 +910,83 @@
 
         function updateCampaignSearch(eventId, val) {
             campaignSearches[eventId] = val;
-            renderCampaigns();
+            
+            // Met à jour la liste des militants filtrés dans le DOM de manière ciblée SANS recréer l'input (pour ne pas perdre le focus)
+            let queueContainer = document.getElementById(`queue_container_${eventId}`);
+            if(!queueContainer) { renderCampaigns(); return; }
+
+            let camp = campaigns[eventId];
+            let queueList = camp.queue || [];
+            let currentFilter = activeCampaignFilters[eventId] || 'all';
+            let currentSort = activeCampaignSorts[eventId] || 'name';
+            let currentSearch = val.toLowerCase();
+
+            let filteredQueue = queueList.filter(item => {
+                let internalStatus = item.status === 'En attente de réponse' ? 'En attente' : item.status;
+                if (currentFilter !== 'all' && internalStatus !== currentFilter) return false;
+                if (currentSearch) {
+                    let fullName = `${item.name} ${item.lastname || ''} ${item.company || ''} ${item.city || ''} ${item.phone}`.toLowerCase();
+                    if (!fullName.includes(currentSearch)) return false;
+                }
+                return true;
+            });
+
+            filteredQueue.sort((a, b) => {
+                if (currentSort === 'name') {
+                    let nameA = (a.name || '').toLowerCase();
+                    let nameB = (b.name || '').toLowerCase();
+                    if (nameA !== nameB) return nameA.localeCompare(nameB);
+                    return (a.lastname || '').toLowerCase().localeCompare((b.lastname || '').toLowerCase());
+                } else if (currentSort === 'status') {
+                    return (a.status || '').localeCompare(b.status || '');
+                } else if (currentSort === 'sent') {
+                    return (b.lastSentTimestamp || 0) - (a.lastSentTimestamp || 0);
+                }
+                return 0;
+            });
+
+            let queueHtml = '';
+            filteredQueue.forEach((item) => {
+                let realIndex = queueList.indexOf(item);
+                let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente' || item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                let displayStatus = item.status === 'En attente de réponse' ? 'En attente' : item.status;
+                const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+                const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
+                const cityStr = item.city ? ` (${item.city})` : '';
+
+                let templateOptions = '';
+                for (let cat in templates) {
+                    let cLabel = templates[cat]?.label || cat;
+                    templateOptions += `<option value="${cat}">${cLabel}</option>`;
+                }
+
+                queueHtml += `
+                    <div class="sms-item">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
+                            <div style="display:flex; align-items:center; gap:5px;">
+                                <span class="tag ${badgeClass}">${displayStatus}</span>
+                                <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
+                            </div>
+                        </div>
+                        <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
+                        <div style="display:flex; gap:5px; margin-bottom:8px;">
+                            <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
+                            <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
+                        <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
+                        <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                            <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
+                            <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
+                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
+                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
+                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
+                        </div>
+                    </div>`;
+            });
+
+            queueContainer.innerHTML = queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond à la recherche/filtre.</p>';
         }
 
         function renderCampaigns() {
@@ -976,7 +1036,7 @@
                     if(item.status === 'Participe') stats.oui++;
                     else if(item.status === 'Refus') stats.non++;
                     else if(item.status === 'Peut-être') stats.peutetre++;
-                    else if(item.status === 'En attente de réponse') stats.attente++;
+                    else if(item.status === 'En attente' || item.status === 'En attente de réponse') stats.attente++;
                     else stats.contacter++;
                 });
 
@@ -987,7 +1047,8 @@
                 let currentSearch = (campaignSearches[eventId] || '').toLowerCase();
 
                 let filteredQueue = queueList.filter(item => {
-                    if (currentFilter !== 'all' && item.status !== currentFilter) return false;
+                    let internalStatus = item.status === 'En attente de réponse' ? 'En attente' : item.status;
+                    if (currentFilter !== 'all' && internalStatus !== currentFilter) return false;
                     if (currentSearch) {
                         let fullName = `${item.name} ${item.lastname || ''} ${item.company || ''} ${item.city || ''} ${item.phone}`.toLowerCase();
                         if (!fullName.includes(currentSearch)) return false;
@@ -1013,7 +1074,8 @@
                 if(isExpanded) {
                     filteredQueue.forEach((item) => {
                         let realIndex = queueList.indexOf(item);
-                        let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                        let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente' || item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                        let displayStatus = item.status === 'En attente de réponse' ? 'En attente' : item.status;
                         const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
                         const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
                         const cityStr = item.city ? ` (${item.city})` : '';
@@ -1029,7 +1091,7 @@
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
                                     <div style="display:flex; align-items:center; gap:5px;">
-                                        <span class="tag ${badgeClass}">${item.status}</span>
+                                        <span class="tag ${badgeClass}">${displayStatus}</span>
                                         <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
                                     </div>
                                 </div>
@@ -1042,7 +1104,7 @@
                                 <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
                                 <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ Attente</button>
+                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
@@ -1067,7 +1129,7 @@
                             <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Participe')" style="background:${currentFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${stats.oui}</span>
                             <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Peut-être')" style="background:${currentFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${stats.peutetre}</span>
                             <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'Refus')" style="background:${currentFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${stats.non}</span>
-                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'En attente de réponse')" style="background:${currentFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
+                            <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'En attente')" style="background:${currentFilter==='En attente'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente : ${stats.attente}</span>
                             <span class="stats-badge" onclick="filterCampaignStatus('${eventId}', 'À contacter')" style="background:${currentFilter==='À contacter'?'#e2e8f0':'#f7fafc'}; color:#4a5568;">🔄 À contacter : ${stats.contacter}</span>
                         </div>
 
@@ -1101,7 +1163,7 @@
                                         </select>
                                     </div>
                                 </div>
-                                <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond à la recherche/filtre.</p>'}</div>
+                                <div id="queue_container_${eventId}">${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond à la recherche/filtre.</p>'}</div>
                             </div>
                         ` : ''}
                     </div>`;
@@ -1137,7 +1199,7 @@
             const now = new Date();
             campaigns[eventId].queue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
             campaigns[eventId].queue[index].lastSentTimestamp = now.getTime();
-            if(campaigns[eventId].queue[index].status === 'À contacter') campaigns[eventId].queue[index].status = 'En attente de réponse';
+            if(campaigns[eventId].queue[index].status === 'À contacter') campaigns[eventId].queue[index].status = 'En attente';
             saveData();
         }
 
@@ -1186,7 +1248,7 @@
                     if(parts.length === 3) targetDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
                 }
 
-                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, html = '';
+                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, totalOverall = 0, html = '';
                 
                 Object.values(campaigns).forEach(camp => {
                     if (!isCampInPeriod(camp)) return;
@@ -1195,28 +1257,32 @@
                     let cYes = 0, cMaybe = 0, cNo = 0, cWaiting = 0, cContact = 0, rows = '';
                     if (camp.queue) {
                         camp.queue.forEach(item => {
-                            if(item.status === 'Participe') { cYes++; totalYes++; }
-                            else if(item.status === 'Peut-être') { cMaybe++; totalMaybe++; }
-                            else if(item.status === 'Refus') { cNo++; totalNo++; }
-                            else if(item.status === 'En attente de réponse') { cWaiting++; totalWaiting++; }
-                            else if(item.status === 'À contacter') { cContact++; totalContact++; }
+                            totalOverall++;
+                            let st = (item.status === 'En attente de réponse') ? 'En attente' : item.status;
+                            if(st === 'Participe') { cYes++; totalYes++; }
+                            else if(st === 'Peut-être') { cMaybe++; totalMaybe++; }
+                            else if(st === 'Refus') { cNo++; totalNo++; }
+                            else if(st === 'En attente') { cWaiting++; totalWaiting++; }
+                            else if(st === 'À contacter') { cContact++; totalContact++; }
 
-                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+                            if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
-                            let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente' ? 'bg-warning' : 'bg-info')));
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
 
                     if(globalStatStatusFilter !== 'all' && !rows) return;
 
+                    let cTotal = cYes + cMaybe + cNo + cWaiting + cContact;
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📅 Date : ${camp.date} — ${camp.originalName || camp.name}</h3>
+                        <div style="margin-bottom:8px; font-size:0.85rem; color:var(--gray);"><strong>Total : ${cTotal}</strong> (Oui: ${cYes}, Peut-être: ${cMaybe}, Non: ${cNo}, En attente: ${cWaiting}, À contacter: ${cContact})</div>
                         <div style="margin-bottom:8px;">
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
-                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${cWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
                         <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
@@ -1226,11 +1292,11 @@
                 let filterActiveTag = globalStatStatusFilter !== 'all' ? ` <button onclick="setGlobalStatStatusFilter('all')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem; background:var(--gray);">Annuler le filtre (${globalStatStatusFilter}) ✕</button>` : '';
 
                 globalContainer.innerHTML = `
-                    <div style="margin-bottom:5px;"><strong>Statistiques globales (période sélectionnée) :</strong>${filterActiveTag}</div>
+                    <div style="margin-bottom:8px; font-weight:bold; color:var(--primary-dark);">📊 Bilan Global (période sélectionnée) : sur ${totalOverall} personnes enregistrées, ${totalYes} ont dit oui, ${totalNo} ont dit non, ${totalMaybe} hésitent, ${totalWaiting} sont en attente, et ${totalContact} restent à contacter.${filterActiveTag}</div>
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:${globalStatStatusFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${totalYes}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:${globalStatStatusFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:${globalStatStatusFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${totalNo}</span> 
-                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente')" style="background:${globalStatStatusFilter==='En attente'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente : ${totalWaiting}</span>
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:${globalStatStatusFilter==='À contacter'?'#cbd5e0':'#edf2f7'}; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
                 `;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette période/filtre.</p>';
@@ -1246,7 +1312,7 @@
                 selectHtml += `</select>`;
                 inputWrapper.innerHTML = selectHtml;
 
-                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, html = '';
+                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, totalOverall = 0, html = '';
                 for (let id in campaigns) {
                     let camp = campaigns[id];
                     if (!isCampInPeriod(camp)) continue;
@@ -1255,28 +1321,32 @@
                     let cYes = 0, cMaybe = 0, cNo = 0, cWaiting = 0, cContact = 0, rows = '';
                     if(camp.queue) {
                         camp.queue.forEach(item => {
-                            if(item.status === 'Participe') { cYes++; totalYes++; }
-                            else if(item.status === 'Peut-être') { cMaybe++; totalMaybe++; }
-                            else if(item.status === 'Refus') { cNo++; totalNo++; }
-                            else if(item.status === 'En attente de réponse') { cWaiting++; totalWaiting++; }
-                            else if(item.status === 'À contacter') { cContact++; totalContact++; }
+                            totalOverall++;
+                            let st = (item.status === 'En attente de réponse') ? 'En attente' : item.status;
+                            if(st === 'Participe') { cYes++; totalYes++; }
+                            else if(st === 'Peut-être') { cMaybe++; totalMaybe++; }
+                            else if(st === 'Refus') { cNo++; totalNo++; }
+                            else if(st === 'En attente') { cWaiting++; totalWaiting++; }
+                            else if(st === 'À contacter') { cContact++; totalContact++; }
 
-                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+                            if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
-                            let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente' ? 'bg-warning' : 'bg-info')));
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
 
                     if(globalStatStatusFilter !== 'all' && !rows) continue;
 
+                    let cTotal = cYes + cMaybe + cNo + cWaiting + cContact;
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 Action : ${camp.originalName || camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
+                        <div style="margin-bottom:8px; font-size:0.85rem; color:var(--gray);"><strong>Total : ${cTotal}</strong> (Oui: ${cYes}, Peut-être: ${cMaybe}, Non: ${cNo}, En attente: ${cWaiting}, À contacter: ${cContact})</div>
                         <div style="margin-bottom:8px;">
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
-                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${cWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
                         <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
@@ -1286,11 +1356,11 @@
                 let filterActiveTag = globalStatStatusFilter !== 'all' ? ` <button onclick="setGlobalStatStatusFilter('all')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem; background:var(--gray);">Annuler le filtre (${globalStatStatusFilter}) ✕</button>` : '';
 
                 globalContainer.innerHTML = `
-                    <div style="margin-bottom:5px;"><strong>Statistiques globales (période sélectionnée) :</strong>${filterActiveTag}</div>
+                    <div style="margin-bottom:8px; font-weight:bold; color:var(--primary-dark);">📊 Bilan Global (période sélectionnée) : sur ${totalOverall} personnes enregistrées, ${totalYes} ont dit oui, ${totalNo} ont dit non, ${totalMaybe} hésitent, ${totalWaiting} sont en attente, et ${totalContact} restent à contacter.${filterActiveTag}</div>
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:${globalStatStatusFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${totalYes}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:${globalStatStatusFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:${globalStatStatusFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${totalNo}</span> 
-                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente')" style="background:${globalStatStatusFilter==='En attente'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:${globalStatStatusFilter==='À contacter'?'#cbd5e0':'#edf2f7'}; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
                 `;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
@@ -1326,19 +1396,20 @@
                         if (camp.queue) {
                             camp.queue.forEach(item => {
                                 if (cleanPhone(item.phone) === mPhoneClean) {
-                                    if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+                                    let st = (item.status === 'En attente de réponse') ? 'En attente' : item.status;
+                                    if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
                                     mParticipations++;
-                                    if (item.status === 'Participe') mYes++;
-                                    else if (item.status === 'Peut-être') mMaybe++;
-                                    else if (item.status === 'Refus') mNo++;
-                                    else if (item.status === 'En attente de réponse') mWaiting++;
-                                    else if (item.status === 'À contacter') mContact++;
+                                    if (st === 'Participe') mYes++;
+                                    else if (st === 'Peut-être') mMaybe++;
+                                    else if (st === 'Refus') mNo++;
+                                    else if (st === 'En attente') mWaiting++;
+                                    else if (st === 'À contacter') mContact++;
 
-                                    let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                                    let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente' ? 'bg-warning' : 'bg-info')));
                                     historyRows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
                                         <td style="padding:6px;"><strong>${camp.originalName || camp.name}</strong><br><span style="color:var(--gray); font-size:0.75rem;">${camp.date}</span></td>
-                                        <td style="padding:6px;"><span class="tag ${badgeClass}">${item.status}</span></td>
+                                        <td style="padding:6px;"><span class="tag ${badgeClass}">${st}</span></td>
                                         <td style="padding:6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
                                     </tr>`;
                                 }
@@ -1355,11 +1426,11 @@
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">👤 ${mDisplayName}${compBadge}${cityStr} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${m.phone})</span></h3>
                         <div style="margin-bottom:8px;">
-                            <span class="stats-badge">📌 Actions : ${mParticipations}</span>
+                            <span class="stats-badge">📌 Total Actions : ${mParticipations}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${mYes}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${mMaybe}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${mNo}</span>
-                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${mWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${mWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${mContact}</span>
                         </div>
                         ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce filtre.</p>'}
@@ -1398,7 +1469,8 @@
                     if (!isCampInPeriod(camp)) return;
                     if (camp.queue) {
                         camp.queue.forEach(item => {
-                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+                            let st = (item.status === 'En attente de réponse') ? 'En attente' : item.status;
+                            if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
                             let fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
                             let row = [
                                 `"${(camp.originalName || camp.name).replace(/"/g, '""')}"`,
@@ -1406,7 +1478,7 @@
                                 `"${(camp.location || '').replace(/"/g, '""')}"`,
                                 `"${fullName.replace(/"/g, '""')}"`,
                                 `"${item.phone}"`,
-                                `"${item.status}"`,
+                                `"${st}"`,
                                 `"${item.sentAt || 'Jamais'}"`
                             ];
                             csvContent += row.join(",") + "\r\n";
@@ -1432,7 +1504,8 @@
                         if (camp.queue) {
                             camp.queue.forEach(item => {
                                 if (cleanPhone(item.phone) === mPhoneClean) {
-                                    if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+                                    let st = (item.status === 'En attente de réponse') ? 'En attente' : item.status;
+                                    if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
                                     foundAny = true;
                                     let row = [
                                         `"${mName.replace(/"/g, '""')}"`,
@@ -1441,7 +1514,7 @@
                                         `"${m.phone}"`,
                                         `"${(camp.originalName || camp.name).replace(/"/g, '""')}"`,
                                         `"${camp.date}"`,
-                                        `"${item.status}"`,
+                                        `"${st}"`,
                                         `"${item.sentAt || 'Jamais'}"`
                                     ];
                                     csvContent += row.join(",") + "\r\n";
@@ -1568,7 +1641,7 @@
                             <span style="color:var(--gray);">(${m.phone})</span>
                         </div>
                         <div style="display:flex; gap:5px;">
-                            <button class="edit-btn" onclick="editMilitant(${realIndex})">✏️️ Modifier</button>
+                            <button class="edit-btn" onclick="editMilitant(${realIndex})">✏️ Modifier</button>
                             <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
                         </div>
                     </li>`;
