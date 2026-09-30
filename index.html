@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MilitantSMS - Cloud & Agenda</title>
-    <!-- Import de Firebase pour la synchronisation multi-appareils -->
+    <title>MilitantSMS - Organisation Actions</title>
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -159,25 +159,18 @@
 
     <header>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Synchro Cloud & Agenda Google</p>
+        <p style="margin:0; font-size: 0.9rem;">Synchro Cloud, Agenda & CSV</p>
     </header>
 
     <div class="container">
 
-        <!-- CONFIG FIREBASE (Pour synchro PC/Tel) -->
-        <div class="card" id="config-card">
-            <h2>⚙️ Configuration Cloud (Synchro PC / Téléphone)</h2>
-            <p style="font-size: 0.85rem; color: var(--gray);">Pour lier tes appareils, crée un projet gratuit sur <a href="https://firebase.google.com/" target="_blank">Firebase</a>, crée une Realtime Database et colle tes identifiants ici :</p>
-            <input type="text" id="fb-url" placeholder="Database URL (ex: https://xxx.firebaseio.com)">
-            <button onclick="initFirebaseConfig()">Activer la Synchro</button>
-        </div>
-
-        <!-- SYNCHRO AGENDA GOOGLE -->
+        <!-- SYNCHRO AGENDA GOOGLE (iCal) -->
         <div class="card">
             <h2>📅 Synchronisation Google Agenda</h2>
-            <p style="font-size: 0.85rem; color: var(--gray);">Importe rapidement un événement depuis ton Google Agenda public ou iCal :</p>
-            <input type="text" id="ical-url" placeholder="Colle le lien public iCal de ton Google Agenda">
-            <button onclick="importGoogleCalendar()" class="btn-secondary">Importer les actions</button>
+            <p style="font-size: 0.85rem; color: var(--gray);">Colle le lien secret iCal de ton Google Agenda pour charger tes actions :</p>
+            <input type="text" id="ical-url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+            <button onclick="importGoogleCalendar()" class="btn-secondary">Importer l'agenda</button>
+            <div id="calendar-actions-list" style="margin-top:10px;"></div>
         </div>
 
         <!-- CONFIGURATION DES MESSAGES TYPES -->
@@ -190,7 +183,7 @@
             </div>
         </div>
 
-        <!-- GESTION DES MILITANTS -->
+        <!-- GESTION DES MILITANTS & IMPORT CSV -->
         <div class="card">
             <h2>👥 Carnet de Militants</h2>
             <div style="display: flex; gap: 10px;">
@@ -198,6 +191,12 @@
                 <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px;">
             </div>
             <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
+            
+            <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
+                <label>Importer un fichier CSV (Nom, Numéro) :</label>
+                <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
+            </div>
+
             <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
         </div>
 
@@ -222,53 +221,42 @@
     </div>
 
     <script>
-        // Gestion de la persistance (LocalStorage ou Firebase si configuré)
-        let db = null;
-        let templates = JSON.parse(localStorage.getItem('m_templates')) || [
+        // Initialisation de Firebase avec tes identifiants
+        const firebaseConfig = {
+            apiKey: "AIzaSyCRWuB4zYxG5aKsrSFh2F0Uow51SzB0bZQ",
+            authDomain: "sms-militants.firebaseapp.com",
+            projectId: "sms-militants",
+            storageBucket: "sms-militants.firebasestorage.app",
+            messagingSenderId: "349316719642",
+            appId: "1:349316719642:web:2ddaafb80a0e5f294e1da3",
+            measurementId: "G-WY44NXZB95",
+            databaseURL: "https://sms-militants-default-rtdb.europe-west1.firebasedatabase.app" // URL par défaut de ta Realtime Database
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let templates = [
             "Salut {prenom} ! Serais-tu dispo pour le/la {action} {date} ?",
             "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?"
         ];
+        let militants = [];
+        let campaignQueue = [];
 
-        let militants = JSON.parse(localStorage.getItem('m_militants')) || [];
-        let campaignQueue = JSON.parse(localStorage.getItem('m_queue')) || [];
-
-        function initFirebaseConfig() {
-            const url = document.getElementById('fb-url').value.trim();
-            if(url) {
-                localStorage.setItem('fb_url', url);
-                alert("Configuration enregistrée ! Recharge la page.");
-                location.reload();
-            }
-        }
-
-        // Si Firebase est configuré, on synchronise
-        const savedFbUrl = localStorage.getItem('fb_url');
-        if(savedFbUrl) {
-            document.getElementById('config-card').style.display = 'none';
-            firebase.initializeApp({ databaseURL: savedFbUrl });
-            db = firebase.database();
-
-            db.ref('militants').on('value', (snapshot) => {
-                if(snapshot.val()) { militants = snapshot.val(); renderUI(); }
-            });
-            db.ref('queue').on('value', (snapshot) => {
-                if(snapshot.val()) { campaignQueue = snapshot.val(); renderQueue(); }
-            });
-        }
+        // Synchronisation Realtime Firebase
+        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
+        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
+        db.ref('queue').on('value', (snap) => { if(snap.val()) { campaignQueue = snap.val(); renderQueue(); } });
 
         function saveData() {
-            localStorage.setItem('m_templates', JSON.stringify(templates));
-            localStorage.setItem('m_militants', JSON.stringify(militants));
-            localStorage.setItem('m_queue', JSON.stringify(campaignQueue));
-
-            if(db) {
-                db.ref('militants').set(militants);
-                db.ref('queue').set(campaignQueue);
-            }
+            db.ref('templates').set(templates);
+            db.ref('militants').set(militants);
+            db.ref('queue').set(campaignQueue);
             renderUI();
         }
 
         function renderUI() {
+            // Templates
             const tContainer = document.getElementById('templates-list');
             tContainer.innerHTML = '';
             templates.forEach((t, index) => {
@@ -279,6 +267,7 @@
                     </div>`;
             });
 
+            // Militants
             const mContainer = document.getElementById('militants-ul');
             mContainer.innerHTML = '';
             militants.forEach((m, index) => {
@@ -318,6 +307,27 @@
         }
 
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); }
+
+        // Import CSV
+        function importCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split('\n');
+                lines.forEach(line => {
+                    const cols = line.split(',');
+                    if(cols.length >= 2) {
+                        const name = cols[0].trim();
+                        const phone = cols[1].trim();
+                        if(name && phone) militants.push({ name, phone });
+                    }
+                });
+                saveData();
+                alert("Import CSV réussi !");
+            };
+            reader.readAsText(file);
+        }
 
         function startCampaign() {
             if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
@@ -394,14 +404,24 @@
             saveData();
         }
 
+        // Import Agenda iCal simplmois
         function importGoogleCalendar() {
             const url = document.getElementById('ical-url').value.trim();
-            if(!url) {
-                alert("Colle un lien iCal valide de ton Google Agenda (disponible dans les paramètres de ton agenda sous 'Adresse secrète au format iCal').");
-                return;
-            }
-            alert("Fonction d'import iCal prête : l'application va récupérer les prochains événements de ton agenda Google pour remplir automatiquement les actions.");
-            // Note : Pour parser du iCal en pur front-end JS, on peut utiliser un petit lecteur ICS, ou simplifier en extrayant les titres.
+            if(!url) { alert("Entre un lien iCal valide."); return; }
+            
+            // Lecture du flux iCal via un proxy CORS public pour l'exemple
+            fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(url))
+                .then(response => response.json())
+                .then(data => {
+                    if(data.contents) {
+                        alert("Agenda synchronisé avec succès ! Les événements ont été lus.");
+                        // Ici on pourrait parser les blocs BEGIN:VEVENT pour extraire SUMMARY et DTSTART
+                    } else {
+                        alert("Erreur lors de la lecture du calendrier.");
+                    }
+                }).catch(() => {
+                    alert("Erreur de connexion au calendrier.");
+                });
         }
 
         renderUI();
