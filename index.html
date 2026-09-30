@@ -159,25 +159,24 @@
 
     <header>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Organisation & Coordination des Actions</p>
+        <p style="margin:0; font-size: 0.9rem;">Coordination Google Agenda & SMS</p>
     </header>
 
     <div class="container">
 
-        <!-- ÉVÉNEMENTS DE L'AGENDA AVEC FILTRES DE TRI -->
+        <!-- ÉVÉNEMENTS DE L'AGENDA GOOGLE -->
         <div class="card">
-            <h2>📅 Événements de l'Agenda</h2>
+            <h2>📅 Actions de l'Agenda Google</h2>
             
-            <!-- Options de filtrage -->
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <select id="filter-mode" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem; background: #fff;">
-                    <option value="upcoming">⏳ Actions à venir (Futur)</option>
+                    <option value="upcoming">⏳ Actions à venir</option>
                     <option value="all">📜 Tout l'historique</option>
                 </select>
             </div>
 
             <div id="calendar-events-container">
-                <p style="font-size:0.85rem; color: var(--gray);">Chargement des événements...</p>
+                <p style="font-size:0.85rem; color: var(--gray);">Chargement des actions...</p>
             </div>
         </div>
 
@@ -208,21 +207,9 @@
             <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
         </div>
 
-        <!-- LANCER UNE ACTION -->
-        <div class="card">
-            <h2>🚀 Lancer une campagne d'action</h2>
-            <label>Nom de l'action :</label>
-            <input type="text" id="action-name" value="Tractage au marché">
-
-            <label>Date et Heure :</label>
-            <input type="text" id="action-date" value="ce samedi à 10h">
-
-            <button onclick="startCampaign()">Générer la file d'attente SMS</button>
-        </div>
-
-        <!-- FILE D'ATTENTE DES SMS -->
+        <!-- FILE D'ATTENTE DES SMS (S'affiche lors du choix d'une action) -->
         <div class="card" id="campaign-card" style="display:none;">
-            <h2>📋 File d'attente des envois</h2>
+            <h2>📋 File d'attente pour : <span id="active-action-title" style="color:var(--primary);"></span></h2>
             <div id="queue-container"></div>
         </div>
 
@@ -244,12 +231,13 @@
         const db = firebase.database();
 
         let templates = [
-            "Salut {prenom} ! Serais-tu dispo pour le/la {action} {date} ?",
-            "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?"
+            "Salut {prenom} ! Serais-tu dispo pour le/la {action} le {date} ?",
+            "Hello {prenom} ! On organise un/une {action} le {date}, tu seras des nôtres ?"
         ];
         let militants = [];
         let campaignQueue = [];
         let calendarEvents = [];
+        let currentSelectedAction = "";
 
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
@@ -294,20 +282,18 @@
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
             if(!calendarEvents || calendarEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement enregistré.</p>';
+                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement dans l\'agenda.</p>';
                 return;
             }
 
             const filterMode = document.getElementById('filter-mode').value;
             const nowTime = new Date().getTime();
 
-            // Filtrage selon le mode sélectionné
             let filteredEvents = calendarEvents.filter(ev => {
                 if (filterMode === 'upcoming') {
-                    // Garde uniquement les événements dont le timestamp est futur (ou supérieur à aujourd'hui)
                     return ev.timestamp && ev.timestamp >= nowTime;
                 }
-                return true; // 'all'
+                return true;
             });
 
             if(filteredEvents.length === 0) {
@@ -317,22 +303,47 @@
 
             container.innerHTML = '';
             filteredEvents.forEach((ev) => {
-                const safeSummary = ev.summary.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const safeSummary = (ev.summary || 'Action militante').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const dateTimeStr = ev.time ? `${ev.date} à ${ev.time}` : ev.date;
+                const locationStr = ev.location ? `📍 ${ev.location}` : '';
+
                 container.innerHTML += `
-                    <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:10px; border-radius:6px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;">
-                        <div>
-                            <strong>${ev.summary}</strong><br>
-                            <span style="font-size:0.75rem; color:var(--gray);">📅 ${ev.date}</span>
+                    <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:8px; margin-bottom:10px;">
+                        <div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${ev.summary}</div>
+                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">
+                            📅 ${dateTimeStr} ${locationStr ? '<br>' + locationStr : ''}
                         </div>
-                        <button onclick="useEventData('${safeSummary}', '${ev.date}')" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem;">Utiliser</button>
+                        <button onclick="startCampaignForEvent('${safeSummary}', '${dateTimeStr}')" style="padding:8px 12px; font-size:0.85rem;">Lancer la campagne SMS</button>
                     </div>`;
             });
         }
 
-        function useEventData(title, date) {
-            document.getElementById('action-name').value = title;
-            document.getElementById('action-date').value = "le " + date;
-            window.scrollTo({ top: document.getElementById('action-name').offsetTop - 50, behavior: 'smooth' });
+        function startCampaignForEvent(actionName, actionDate) {
+            if(militants.length === 0) { alert("Ajoute d'abord des militants dans ton carnet !"); return; }
+            if(templates.length === 0) { alert("Ajoute au moins un message type !"); return; }
+
+            currentSelectedAction = actionName;
+            document.getElementById('active-action-title').innerText = actionName;
+
+            campaignQueue = militants.map(m => {
+                const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+                let msg = randomTemplate
+                    .replace(/{prenom}/g, m.name)
+                    .replace(/{action}/g, actionName)
+                    .replace(/{date}/g, actionDate);
+                
+                return {
+                    name: m.name,
+                    phone: m.phone,
+                    message: msg,
+                    status: 'En attente',
+                    sentAt: null
+                };
+            });
+
+            saveData();
+            document.getElementById('campaign-card').style.display = 'block';
+            window.scrollTo({ top: document.getElementById('campaign-card').offsetTop - 50, behavior: 'smooth' });
         }
 
         function addTemplate() {
@@ -377,32 +388,6 @@
                 alert("Import CSV réussi !");
             };
             reader.readAsText(file);
-        }
-
-        function startCampaign() {
-            if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
-            if(templates.length === 0) { alert("Ajoute au moins un message type !"); return; }
-
-            const actionName = document.getElementById('action-name').value;
-            const actionDate = document.getElementById('action-date').value;
-
-            campaignQueue = militants.map(m => {
-                const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
-                let msg = randomTemplate
-                    .replace(/{prenom}/g, m.name)
-                    .replace(/{action}/g, actionName)
-                    .replace(/{date}/g, actionDate);
-                
-                return {
-                    name: m.name,
-                    phone: m.phone,
-                    message: msg,
-                    status: 'En attente',
-                    sentAt: null
-                };
-            });
-
-            saveData();
         }
 
         function renderQueue() {
