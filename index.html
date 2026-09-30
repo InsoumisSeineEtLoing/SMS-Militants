@@ -180,9 +180,9 @@
 
         .tag {
             display: inline-block;
-            padding: 4px 8px;
+            padding: 3px 7px;
             border-radius: 6px;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: bold;
             color: white;
         }
@@ -209,6 +209,7 @@
             align-items: center;
             padding: 10px;
             border-bottom: 1px solid #edf2f7;
+            font-size: 0.9rem;
         }
 
         .delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-weight: bold; width: auto; padding: 5px; }
@@ -318,21 +319,22 @@
                 <h2>👥 Carnet de Militants</h2>
                 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 90px;">
-                    <input type="text" id="m-lastname" placeholder="Nom" style="margin-bottom:10px; flex: 1; min-width: 90px;">
-                    <input type="text" id="m-company" placeholder="Entreprise / Tag (ex: LFI)" style="margin-bottom:10px; flex: 1; min-width: 100px;">
-                    <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 110px;">
+                    <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 80px;">
+                    <input type="text" id="m-lastname" placeholder="Nom" style="margin-bottom:10px; flex: 1; min-width: 80px;">
+                    <input type="text" id="m-company" placeholder="Entreprise / Tag (ex: LFI)" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="text" id="m-city" placeholder="Lieu / Ville" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 100px;">
                 </div>
                 <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
                 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
-                    <label>Importer un CSV Google Contacts (Prénom, Nom, Entreprise, Téléphone) :</label>
+                    <label>Importer un CSV / Google Contacts :</label>
                     <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
                 </div>
 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
                     <label>Filtrer les militants :</label>
-                    <input type="text" id="militant-search" placeholder="Rechercher par nom ou tag (ex: LFI)..." oninput="renderMilitants()" style="margin-bottom:0;">
+                    <input type="text" id="militant-search" placeholder="Rechercher par nom, tag ou ville..." oninput="renderMilitants()" style="margin-bottom:0;">
                 </div>
 
                 <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
@@ -587,7 +589,7 @@
                     rawDate: rawDateStr,
                     location: actionLocation,
                     timestamp: timestamp || new Date().getTime(),
-                    queue: militants.map(m => ({ name: m.name, lastname: m.lastname || "", company: m.company || "", phone: m.phone, message: "", status: 'À contacter', sentAt: null, lastSentTimestamp: null }))
+                    queue: militants.map(m => ({ name: m.name, lastname: m.lastname || "", company: m.company || "", city: m.city || "", phone: m.phone, message: "", status: 'À contacter', sentAt: null, lastSentTimestamp: null }))
                 };
                 saveData();
             }
@@ -649,7 +651,8 @@
                     let realIndex = camp.queue.indexOf(item);
                     let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info'));
                     const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
-                    const compTag = item.company ? ` [${item.company}]` : '';
+                    const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
+                    const cityStr = item.city ? ` (${item.city})` : '';
 
                     let templateOptions = '';
                     for (let cat in templates) {
@@ -660,7 +663,7 @@
                     queueHtml += `
                         <div class="sms-item">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <strong>${fullName}${compTag} (${item.phone})</strong>
+                                <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
                                 <span class="tag ${badgeClass}">${item.status}</span>
                             </div>
                             <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
@@ -789,20 +792,35 @@
             detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
         }
 
-        // --- MILITANTS & RECHERCHE/TRI ---
+        // --- MILITANTS ---
+        function cleanPhone(phone) {
+            if(!phone) return "";
+            return phone.replace(/[^0-9+]/g, '');
+        }
+
         function addMilitant() {
             const name = document.getElementById('m-name').value.trim();
             const lastname = document.getElementById('m-lastname').value.trim();
             const company = document.getElementById('m-company').value.trim();
-            const phone = document.getElementById('m-phone').value.trim();
-            if(name && phone) { 
-                militants.push({ name, lastname, company, phone }); 
-                document.getElementById('m-name').value=''; 
-                document.getElementById('m-lastname').value=''; 
-                document.getElementById('m-company').value=''; 
-                document.getElementById('m-phone').value=''; 
-                saveData(); renderMilitants(); 
-            } else { alert("Prénom et numéro obligatoires !"); }
+            const city = document.getElementById('m-city').value.trim();
+            let phone = cleanPhone(document.getElementById('m-phone').value);
+
+            if(!name || !phone) { alert("Prénom et numéro obligatoires !"); return; }
+
+            let exists = militants.some(m => cleanPhone(m.phone) === phone);
+            if(exists) {
+                alert("⚠️ Ce numéro de téléphone existe déjà dans le carnet !");
+                return;
+            }
+
+            militants.push({ name, lastname, company, city, phone }); 
+            document.getElementById('m-name').value=''; 
+            document.getElementById('m-lastname').value=''; 
+            document.getElementById('m-company').value=''; 
+            document.getElementById('m-city').value=''; 
+            document.getElementById('m-phone').value=''; 
+            saveData(); 
+            renderMilitants();
         }
 
         function renderMilitants() {
@@ -814,16 +832,21 @@
             mContainer.innerHTML = '';
 
             let filtered = militants.filter(m => {
-                let fullName = `${m.name} ${m.lastname || ''} ${m.company || ''} ${m.phone}`.toLowerCase();
+                let fullName = `${m.name} ${m.lastname || ''} ${m.company || ''} ${m.city || ''} ${m.phone}`.toLowerCase();
                 return fullName.includes(filter);
             });
 
             filtered.forEach((m) => {
                 let realIndex = militants.indexOf(m);
-                let compBadge = m.company ? ` <span class="tag bg-info" style="font-size:0.65rem;">${m.company}</span>` : '';
+                let compBadge = m.company ? ` <span class="tag bg-info">${m.company}</span>` : '';
+                let cityStr = m.city ? ` (${m.city})` : '';
+                
                 mContainer.innerHTML += `
                     <li class="list-group-item">
-                        <span><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge} (${m.phone})</span>
+                        <div>
+                            <strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge}${cityStr} 
+                            <span style="color:var(--gray);">(${m.phone})</span>
+                        </div>
                         <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
                     </li>`;
             });
@@ -838,21 +861,60 @@
             const file = e.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(evt) {
-                let lines = evt.target.result.split('\n');
-                lines.forEach(line => {
-                    let cols = line.split(',');
+                let text = evt.target.result;
+                let lines = text.split('\n');
+                let addedCount = 0;
+                let dupCount = 0;
+
+                // Détection intelligente du CSV Google Contacts
+                lines.forEach((line, idx) => {
+                    if(idx === 0 || !line.trim()) return; // Ignorer l'en-tête
+                    
+                    // Découpage propre gérant les guillemets CSV
+                    let cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
+                    
                     if(cols.length >= 2) {
-                        // Support CSV Google Contacts (Prénom, Nom, Organisation/Entreprise, Téléphone ou similaire)
-                        let name = cols[0]?.trim() || "";
-                        let lastname = cols[1]?.trim() || "";
-                        let company = cols[2]?.trim() || "";
-                        let phone = cols[cols.length - 1]?.trim() || "";
-                        if(name && phone && !name.toLowerCase().includes('name')) {
-                            militants.push({ name, lastname, company, phone });
+                        let name = "";
+                        let lastname = "";
+                        let company = "";
+                        let city = "";
+                        let phone = "";
+
+                        // Si c'est le format standard Google Contacts exporté
+                        if(cols.length > 30) {
+                            name = cols[1] || "";     // Prénom
+                            lastname = cols[3] || ""; // Nom
+                            company = cols[31] || ""; // Organisation / Entreprise
+                            // Recherche d'un numéro de téléphone dans les colonnes de tel
+                            for(let i = 35; i < cols.length; i++) {
+                                if(cols[i] && /^[0-9+() \-\.]+$/.test(cols[i]) && cols[i].length > 5) {
+                                    phone = cleanPhone(cols[i]);
+                                    break;
+                                }
+                            }
+                        } else {
+                            // Format CSV simplifié (Prénom, Nom, Entreprise, Ville, Téléphone)
+                            name = cols[0] || "";
+                            lastname = cols[1] || "";
+                            company = cols[2] || "";
+                            city = cols[3] || "";
+                            phone = cleanPhone(cols[cols.length - 1] || "");
+                        }
+
+                        if(name && phone && !name.toLowerCase().includes('name') && !phone.includes('http')) {
+                            let exists = militants.some(m => cleanPhone(m.phone) === phone);
+                            if(!exists) {
+                                militants.push({ name, lastname, company, city, phone });
+                                addedCount++;
+                            } else {
+                                dupCount++;
+                            }
                         }
                     }
                 });
-                saveData(); renderMilitants(); alert("Import Google Contacts / CSV réussi !");
+                saveData(); 
+                renderMilitants(); 
+                alert(`Import terminé !\n- Ajoutés : ${addedCount}\n- Doublons ignorés : ${dupCount}`);
             };
             reader.readAsText(file);
         }
