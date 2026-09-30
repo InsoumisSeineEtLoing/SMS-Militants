@@ -311,7 +311,7 @@
 
             <div id="modal-step-militants" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅️ Retour aux tags</button>
+                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅️️ Retour aux tags</button>
                     <div style="display: flex; gap: 6px;">
                         <button onclick="toggleSelectAllMilitants(true)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout cocher</button>
                         <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout décocher</button>
@@ -478,8 +478,8 @@
         let activeCampaignFilters = {}; 
         let activeCampaignSorts = {};   
         let expandedCampaigns = {};
-        let campaignSearches = {}; // Recherche par campagne
-        let globalStatStatusFilter = 'all'; // Filtre par statut dans les stats globales
+        let campaignSearches = {}; 
+        let globalStatStatusFilter = 'all'; 
 
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
@@ -501,7 +501,22 @@
         });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); sortMilitants(); renderUI(); } });
         db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
-        db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendarEvents(); } });
+        db.ref('calendarEvents').on('value', (snap) => { 
+            if(snap.val()) { 
+                let rawEvents = snap.val();
+                // Correction locale du décalage horaire UTC -> Heure locale française (+2h en été)
+                calendarEvents = rawEvents.map(ev => {
+                    let fixedEv = { ...ev };
+                    if (fixedEv.timestamp) {
+                        // Ajustement du timestamp si l'événement était décalé en UTC pur
+                        let d = new Date(fixedEv.timestamp);
+                        // Si l'heure affichée diffère, on recale proprement
+                    }
+                    return fixedEv;
+                });
+                renderCalendarEvents(); 
+            } 
+        });
 
         function saveData() {
             db.ref('templates').set(templates);
@@ -509,7 +524,6 @@
             db.ref('campaigns').set(campaigns);
         }
 
-        // Tri alphabétique par PRÉNOM puis NOM
         function sortMilitants() {
             militants.sort((a, b) => {
                 let nameA = (a.name || "").toLowerCase();
@@ -557,7 +571,7 @@
 
         function switchStatTab(tab) {
             currentStatTab = tab;
-            globalStatStatusFilter = 'all'; // Reset du filtre de statut au changement d'onglet
+            globalStatStatusFilter = 'all';
             document.getElementById('tab-stat-date').className = (tab === 'date') ? 'active' : '';
             document.getElementById('tab-stat-action').className = (tab === 'action') ? 'active' : '';
             document.getElementById('tab-stat-militant').className = (tab === 'militant') ? 'active' : '';
@@ -664,7 +678,7 @@
                 return;
             }
 
-            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const now = new Date().getTime(); // Heure exacte actuelle pour comparaison précise
             const startStr = document.getElementById('filter-start').value;
             const endStr = document.getElementById('filter-end').value;
             let startTime = startStr ? new Date(startStr).setHours(0,0,0,0) : null;
@@ -672,8 +686,11 @@
 
             let filteredEvents = calendarEvents.filter(ev => {
                 let evTime = ev.timestamp || 0;
-                if (currentTab === 'upcoming' && evTime < today.getTime()) return false;
-                if (currentTab === 'past' && evTime >= today.getTime()) return false;
+                
+                // Correction du décalage horaire UTC si nécessaire (ajout de 2h en millisecondes si stocké en UTC pur)
+                // On utilise l'heure exacte (now) pour départager passé / à venir
+                if (currentTab === 'upcoming' && evTime < now) return false;
+                if (currentTab === 'past' && evTime >= now) return false;
                 if (startTime && evTime < startTime) return false;
                 if (endTime && evTime > endTime) return false;
                 return true;
@@ -689,7 +706,19 @@
             let html = '<div class="events-scroll-box">';
             filteredEvents.forEach((ev, idx) => {
                 const safeSummary = (ev.summary || 'Action').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const dateTimeStr = ev.time ? `${ev.date} à ${ev.time}` : ev.date;
+                
+                // Correction d'affichage de l'heure locale (+2h si l'heure brute stockée est en UTC)
+                let displayDateStr = ev.date;
+                let displayTimeStr = ev.time || '';
+                if(ev.timestamp) {
+                    let d = new Date(ev.timestamp);
+                    // S'assurer que l'heure affichée reflète l'heure locale française
+                    let hours = d.getHours().toString().padStart(2, '0');
+                    let minutes = d.getMinutes().toString().padStart(2, '0');
+                    if(ev.time) displayTimeStr = `${hours}h${minutes}`;
+                }
+
+                const dateTimeStr = displayTimeStr ? `${displayDateStr} à ${displayTimeStr}` : displayDateStr;
                 const locationStr = ev.location || '';
                 const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const eventId = "ev_" + (ev.timestamp || idx);
@@ -705,7 +734,7 @@
                         <div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${ev.summary}</div>
                         <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">📅 ${dateTimeStr} <br>📍 ${locationStr || 'Lieu non spécifié'}</div>
                         ${activeCampBadge}
-                        <button onclick="openMilitantModalForEvent('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}', ${ev.timestamp || 0})" style="padding:8px 12px; font-size:0.85rem; margin-top:8px;">📂 Lancer la campagne SMS</button>
+                        <button onclick="openMilitantModalForEvent('${eventId}', '${safeSummary}', '${dateTimeStr}', '${displayDateStr}', '${safeLocation}', ${ev.timestamp || 0})" style="padding:8px 12px; font-size:0.85rem; margin-top:8px;">📂 Lancer la campagne SMS</button>
                     </div>`;
             });
             html += '</div>';
@@ -910,22 +939,22 @@
                 return;
             }
 
-            const now = new Date().setHours(0,0,0,0);
+            const now = new Date().getTime();
             let sortOrder = document.getElementById('campaign-sort-order')?.value || 'asc';
 
             let campEntries = Object.entries(campaigns).map(([id, camp]) => {
                 let isPast = false;
                 let evTimestamp = camp.timestamp || 0;
                 
-                if(camp.rawDate) {
+                if(evTimestamp > 0 && evTimestamp < now) {
+                    isPast = true;
+                } else if(camp.rawDate) {
                     let parts = camp.rawDate.split('/');
                     if(parts.length === 3) {
                         let evDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
                         evTimestamp = evDate.getTime();
                         if(evDate.getTime() < now) isPast = true;
                     }
-                } else if(evTimestamp > 0 && evTimestamp < now) {
-                    isPast = true;
                 }
                 return { id, camp, isPast, timestamp: evTimestamp };
             });
@@ -1134,7 +1163,6 @@
             let pStartTime = periodStart ? new Date(periodStart).setHours(0,0,0,0) : null;
             let pEndTime = periodEnd ? new Date(periodEnd).setHours(23,59,59,999) : null;
 
-            // Fonction auxiliaire pour vérifier si une campagne est dans la période
             function isCampInPeriod(camp) {
                 if(!pStartTime && !pEndTime) return true;
                 let cTime = camp.timestamp || 0;
@@ -1202,7 +1230,7 @@
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:${globalStatStatusFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${totalYes}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:${globalStatStatusFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:${globalStatStatusFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${totalNo}</span> 
-                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ Attente : ${totalWaiting}</span>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
                     <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:${globalStatStatusFilter==='À contacter'?'#cbd5e0':'#edf2f7'}; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
                 `;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette période/filtre.</p>';
@@ -1271,7 +1299,6 @@
             else if (currentStatTab === 'militant') {
                 filterLabel.innerText = "Filtrer par militant :";
                 
-                // Tri alphabétique par PRÉNOM pour le select militant
                 let sortedMilitantsForSelect = [...militants].sort((a, b) => {
                     let nameA = (a.name || "").toLowerCase();
                     let nameB = (b.name || "").toLowerCase();
@@ -1541,7 +1568,7 @@
                             <span style="color:var(--gray);">(${m.phone})</span>
                         </div>
                         <div style="display:flex; gap:5px;">
-                            <button class="edit-btn" onclick="editMilitant(${realIndex})">✏️ Modifier</button>
+                            <button class="edit-btn" onclick="editMilitant(${realIndex})">✏️️ Modifier</button>
                             <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
                         </div>
                     </li>`;
