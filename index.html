@@ -159,19 +159,10 @@
 
     <header>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Synchro Cloud, Agenda & CSV</p>
+        <p style="margin:0; font-size: 0.9rem;">Organisation & Coordination des Actions</p>
     </header>
 
     <div class="container">
-
-        <!-- SYNCHRO AGENDA GOOGLE (iCal) -->
-        <div class="card">
-            <h2>📅 Synchronisation Google Agenda</h2>
-            <p style="font-size: 0.85rem; color: var(--gray);">Colle le lien secret iCal de ton Google Agenda :</p>
-            <input type="text" id="ical-url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
-            <button onclick="importGoogleCalendar()" class="btn-secondary">Importer l'agenda</button>
-            <div id="calendar-events-container" style="margin-top:15px;"></div>
-        </div>
 
         <!-- CONFIGURATION DES MESSAGES TYPES -->
         <div class="card">
@@ -242,19 +233,16 @@
         ];
         let militants = [];
         let campaignQueue = [];
-        let calendarEvents = [];
 
         // Synchronisation Realtime Firebase
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
         db.ref('queue').on('value', (snap) => { if(snap.val()) { campaignQueue = snap.val(); renderQueue(); } });
-        db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendar(); } });
 
         function saveData() {
             db.ref('templates').set(templates);
             db.ref('militants').set(militants);
             db.ref('queue').set(campaignQueue);
-            db.ref('calendarEvents').set(calendarEvents);
             renderUI();
         }
 
@@ -285,7 +273,6 @@
                 document.getElementById('campaign-card').style.display = 'block';
                 renderQueue();
             }
-            renderCalendar();
         }
 
         function addTemplate() {
@@ -331,86 +318,6 @@
                 alert("Import CSV réussi !");
             };
             reader.readAsText(file);
-        }
-
-        // Import iCal mis à jour avec AllOrigins
-        function importGoogleCalendar() {
-            const url = document.getElementById('ical-url').value.trim();
-            if(!url) { alert("Entre un lien iCal valide."); return; }
-            
-            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-
-            fetch(proxyUrl)
-                .then(response => {
-                    if (!response.ok) throw new Error("Erreur réseau");
-                    return response.text();
-                })
-                .then(icsText => {
-                    calendarEvents = parseICS(icsText);
-                    saveData();
-                    alert(`Agenda synchronisé ! ${calendarEvents.length} événements trouvés.`);
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("Erreur de connexion au calendrier (Vérifie le lien iCal).");
-                });
-        }
-
-        // Parseur simple de fichier ICS pour extraire les événements
-        function parseICS(icsData) {
-            let events = [];
-            let lines = icsData.split(/\r\n|\n|\r/);
-            let currentEvent = null;
-
-            for (let line of lines) {
-                if (line === "BEGIN:VEVENT") {
-                    currentEvent = {};
-                } else if (line === "END:VEVENT" && currentEvent) {
-                    if (currentEvent.summary) events.push(currentEvent);
-                    currentEvent = null;
-                } else if (currentEvent) {
-                    if (line.startsWith("SUMMARY:")) {
-                        currentEvent.summary = line.substring(8);
-                    } else if (line.startsWith("DTSTART")) {
-                        let parts = line.split(":");
-                        let rawDate = parts[parts.length - 1];
-                        currentEvent.date = formatICSDate(rawDate);
-                    }
-                }
-            }
-            return events.slice(0, 10);
-        }
-
-        function formatICSDate(str) {
-            if (str.length >= 8) {
-                let year = str.substring(0, 4);
-                let month = str.substring(4, 6);
-                let day = str.substring(6, 8);
-                return `${day}/${month}/${year}`;
-            }
-            return str;
-        }
-
-        function renderCalendar() {
-            const container = document.getElementById('calendar-events-container');
-            if(!calendarEvents || calendarEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement chargé.</p>';
-                return;
-            }
-            container.innerHTML = '<p style="font-size:0.85rem; font-weight:bold;">Événements à venir :</p>';
-            calendarEvents.forEach((ev) => {
-                container.innerHTML += `
-                    <div style="background:#f7fafc; padding:8px; border-radius:6px; margin-bottom:5px; font-size:0.85rem; display:flex; justify-content:space-between; align-items:center;">
-                        <span>📅 <strong>${ev.summary}</strong> (${ev.date})</span>
-                        <button onclick="useEventData('${ev.summary.replace(/'/g, "\\'")}', '${ev.date}')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem;">Utiliser</button>
-                    </div>`;
-            });
-        }
-
-        function useEventData(title, date) {
-            document.getElementById('action-name').value = title;
-            document.getElementById('action-date').value = "le " + date;
-            window.scrollTo({ top: document.getElementById('action-name').offsetTop - 50, behavior: 'smooth' });
         }
 
         function startCampaign() {
