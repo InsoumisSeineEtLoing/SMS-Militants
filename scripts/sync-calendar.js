@@ -15,16 +15,22 @@ async function sync() {
     for (let k in parsedData) {
         if (parsedData.hasOwnProperty(k)) {
             let ev = parsedData[k];
-            if (ev.type === 'VEVENT') {
+            if (ev.type === 'VEVENT' && ev.start) {
                 let d = new Date(ev.start);
                 let day = String(d.getDate()).padStart(2, '0');
                 let month = String(d.getMonth() + 1).padStart(2, '0');
                 let year = d.getFullYear();
                 let formattedDate = `${day}/${month}/${year}`;
 
+                let hours = String(d.getHours()).padStart(2, '0');
+                let minutes = String(d.getMinutes()).padStart(2, '0');
+                let formattedTime = (hours !== '00' || minutes !== '00') ? `${hours}h${minutes}` : null;
+
                 events.push({
-                    summary: ev.summary,
+                    summary: ev.summary || "Événement sans titre",
                     date: formattedDate,
+                    time: formattedTime,
+                    location: ev.location || "",
                     timestamp: d.getTime()
                 });
             }
@@ -32,7 +38,7 @@ async function sync() {
     }
 
     events.sort((a, b) => a.timestamp - b.timestamp);
-    const upcomingEvents = events.slice(0, 15);
+    const upcomingEvents = events.slice(0, 30);
 
     console.log(`Envoi de ${upcomingEvents.length} événements vers Firebase...`);
     
