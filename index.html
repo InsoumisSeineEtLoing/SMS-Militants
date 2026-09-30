@@ -148,6 +148,16 @@
             padding: 5px 10px;
         }
         
+        .edit-btn {
+            background: none;
+            border: none;
+            color: #3182ce;
+            cursor: pointer;
+            font-weight: bold;
+            width: auto;
+            padding: 5px 10px;
+        }
+
         .meta-info {
             font-size: 0.75rem;
             color: var(--gray);
@@ -164,15 +174,32 @@
 
     <div class="container">
 
-        <!-- ÉVÉNEMENTS DE L'AGENDA GOOGLE -->
+        <!-- ÉVÉNEMENTS DE L'AGENDA GOOGLE & FILTRES -->
         <div class="card">
             <h2>📅 Actions de l'Agenda Google</h2>
             
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <select id="filter-mode" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem; background: #fff;">
-                    <option value="upcoming">⏳ Actions à venir</option>
-                    <option value="all">📜 Tout l'historique</option>
-                </select>
+            <!-- Options de classement et filtre par période -->
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div>
+                    <label style="font-size: 0.8rem; color: var(--gray);">Mode d'affichage :</label>
+                    <select id="filter-mode" onchange="toggleFilterMode()" style="margin-bottom:0; font-size: 0.9rem; background: #fff;">
+                        <option value="upcoming">⏳ Actions à venir (À partir d'aujourd'hui)</option>
+                        <option value="range">📅 Filtrer par période personnalisée</option>
+                        <option value="all">📜 Tout l'historique</option>
+                    </select>
+                </div>
+
+                <!-- Sélecteur de période (masqué par défaut) -->
+                <div id="date-range-container" style="display: none; gap: 10px; margin-top: 5px;">
+                    <div style="flex:1;">
+                        <label style="font-size: 0.8rem;">Du :</label>
+                        <input type="date" id="filter-start" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size: 0.8rem;">Au :</label>
+                        <input type="date" id="filter-end" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem;">
+                    </div>
+                </div>
             </div>
 
             <div id="calendar-events-container">
@@ -190,24 +217,25 @@
             </div>
         </div>
 
-        <!-- GESTION DES MILITANTS & IMPORT CSV -->
+        <!-- GESTION DES MILITANTS (PRÉNOM + NOM) & IMPORT CSV -->
         <div class="card">
             <h2>👥 Carnet de Militants</h2>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px;">
-                <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 120px;">
+                <input type="text" id="m-lastname" placeholder="Nom de famille" style="margin-bottom:10px; flex: 1; min-width: 120px;">
+                <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 120px;">
             </div>
             <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
             
             <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
-                <label>Importer un fichier CSV (Nom, Numéro) :</label>
+                <label>Importer un fichier CSV (Prénom, Nom, Numéro) :</label>
                 <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
             </div>
 
             <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
         </div>
 
-        <!-- FILE D'ATTENTE DES SMS (S'affiche lors du choix d'une action) -->
+        <!-- FILE D'ATTENTE DES SMS -->
         <div class="card" id="campaign-card" style="display:none;">
             <h2>📋 File d'attente pour : <span id="active-action-title" style="color:var(--primary);"></span></h2>
             <div id="queue-container"></div>
@@ -257,17 +285,21 @@
             templates.forEach((t, index) => {
                 tContainer.innerHTML += `
                     <div style="display: flex; justify-content: space-between; align-items: center; background:#f7fafc; padding:8px; border-radius:6px; margin-bottom:5px; font-size:0.9rem;">
-                        <span>"${t}"</span>
-                        <button class="delete-btn" onclick="deleteTemplate(${index})">❌</button>
+                        <span id="t-text-${index}">"${t}"</span>
+                        <div style="display:flex; gap:2px;">
+                            <button class="edit-btn" onclick="editTemplate(${index})">✏️</button>
+                            <button class="delete-btn" onclick="deleteTemplate(${index})">❌</button>
+                        </div>
                     </div>`;
             });
 
             const mContainer = document.getElementById('militants-ul');
             mContainer.innerHTML = '';
             militants.forEach((m, index) => {
+                const displayName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
                 mContainer.innerHTML += `
                     <li class="list-group-item">
-                        <span><strong>${m.name}</strong> (${m.phone})</span>
+                        <span><strong>${displayName}</strong> (${m.phone})</span>
                         <button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button>
                     </li>`;
             });
@@ -275,6 +307,17 @@
             if(campaignQueue.length > 0) {
                 document.getElementById('campaign-card').style.display = 'block';
                 renderQueue();
+            }
+            renderCalendarEvents();
+        }
+
+        function toggleFilterMode() {
+            const mode = document.getElementById('filter-mode').value;
+            const rangeContainer = document.getElementById('date-range-container');
+            if (mode === 'range') {
+                rangeContainer.style.display = 'flex';
+            } else {
+                rangeContainer.style.display = 'none';
             }
             renderCalendarEvents();
         }
@@ -287,17 +330,36 @@
             }
 
             const filterMode = document.getElementById('filter-mode').value;
-            const nowTime = new Date().getTime();
+            // Début de la journée d'aujourd'hui en timestamp
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todayTimestamp = today.getTime();
 
             let filteredEvents = calendarEvents.filter(ev => {
+                if (!ev.timestamp) return false;
+
                 if (filterMode === 'upcoming') {
-                    return ev.timestamp && ev.timestamp >= nowTime;
+                    return ev.timestamp >= todayTimestamp;
+                } else if (filterMode === 'range') {
+                    const startStr = document.getElementById('filter-start').value;
+                    const endStr = document.getElementById('filter-end').value;
+                    
+                    let matches = true;
+                    if (startStr) {
+                        let startTime = new Date(startStr).setHours(0,0,0,0);
+                        if (ev.timestamp < startTime) matches = false;
+                    }
+                    if (endStr) {
+                        let endTime = new Date(endStr).setHours(23,59,59,999);
+                        if (ev.timestamp > endTime) matches = false;
+                    }
+                    return matches;
                 }
-                return true;
+                return true; // 'all'
             });
 
             if(filteredEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucune action à venir trouvée.</p>';
+                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucune action trouvée pour ce filtre.</p>';
                 return;
             }
 
@@ -334,6 +396,7 @@
                 
                 return {
                     name: m.name,
+                    lastname: m.lastname || "",
                     phone: m.phone,
                     message: msg,
                     status: 'En attente',
@@ -355,17 +418,28 @@
             }
         }
 
+        function editTemplate(index) {
+            const currentText = templates[index];
+            const newText = prompt("Modifier le message type :", currentText);
+            if (newText !== null && newText.trim() !== "") {
+                templates[index] = newText.trim();
+                saveData();
+            }
+        }
+
         function deleteTemplate(index) { templates.splice(index, 1); saveData(); }
 
         function addMilitant() {
             const name = document.getElementById('m-name').value.trim();
+            const lastname = document.getElementById('m-lastname').value.trim();
             const phone = document.getElementById('m-phone').value.trim();
             if(name && phone) {
-                militants.push({ name, phone });
+                militants.push({ name, lastname, phone });
                 document.getElementById('m-name').value = '';
+                document.getElementById('m-lastname').value = '';
                 document.getElementById('m-phone').value = '';
                 saveData();
-            } else { alert("Remplis le nom et le numéro !"); }
+            } else { alert("Remplis au moins le prénom et le numéro !"); }
         }
 
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); }
@@ -378,10 +452,17 @@
                 const lines = e.target.result.split('\n');
                 lines.forEach(line => {
                     const cols = line.split(',');
-                    if(cols.length >= 2) {
+                    if(cols.length >= 3) {
+                        // Format attendu : Prénom, Nom, Numéro
+                        const name = cols[0].trim();
+                        const lastname = cols[1].trim();
+                        const phone = cols[2].trim();
+                        if(name && phone) militants.push({ name, lastname, phone });
+                    } else if(cols.length === 2) {
+                        // Ancien format supporté : Prénom, Numéro
                         const name = cols[0].trim();
                         const phone = cols[1].trim();
-                        if(name && phone) militants.push({ name, phone });
+                        if(name && phone) militants.push({ name, lastname: "", phone });
                     }
                 });
                 saveData();
@@ -401,11 +482,12 @@
                 if(item.status === 'En attente de réponse') badgeClass = 'bg-gray';
 
                 let metaText = item.sentAt ? `Envoyé le : ${item.sentAt}` : 'Non envoyé';
+                const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
 
                 container.innerHTML += `
                     <div class="sms-item">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <strong>${item.name} (${item.phone})</strong>
+                            <strong>${fullName} (${item.phone})</strong>
                             <span class="tag ${badgeClass}">${item.status}</span>
                         </div>
                         <div class="message-preview">"${item.message}"</div>
