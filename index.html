@@ -4,6 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMS Militants - Coordination & Statistiques</title>
+    
+    <!-- Favicon et Icônes tactiles pour l'application -->
+    <link rel="icon" type="image/png" href="app-icon.png">
+    <link rel="apple-touch-icon" href="app-icon.png">
+    
+    <!-- Manifeste PWA pour affichage en mode application plein écran -->
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
+      'name': 'SMS Militants',
+      'short_name': 'SMS Militants',
+      'start_url': '.',
+      'display': 'standalone',
+      'background_color': '#f4f6f9',
+      'theme_color': '#e53935',
+      'icons': [{ 'src': 'app-icon.png', 'sizes': '512x512', 'type': 'image/png' }]
+    }">
+
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -1077,7 +1093,7 @@
                             <span style="font-size:0.8rem; color:var(--info);">${m.phone}</span>
                         </div>
                         <div style="display:flex; gap:5px;">
-                            <button class="edit-btn" onclick="editMilitant(${realIdx})">✏️️</button>
+                            <button class="edit-btn" onclick="editMilitant(${realIdx})">✏</button>
                             <button class="delete-btn" onclick="deleteMilitant(${realIdx})">❌</button>
                         </div>
                     </li>
@@ -1128,7 +1144,7 @@
                 let count = 0;
 
                 lines.forEach((line, index) => {
-                    if(index === 0 && (line.toLowerCase().includes('nom') || line.toLowerCase().includes('phone'))) return; // Skip header
+                    if(index === 0 && (line.toLowerCase().includes('nom') || line.toLowerCase().includes('phone'))) return;
                     if(!line.trim()) return;
 
                     let cols = line.split(/,|;/);
@@ -1227,7 +1243,7 @@
                 select.style.marginBottom = '0';
                 select.style.fontSize = '0.85rem';
                 select.style.background = '#fff';
-                select.innerHTML = '<option value="all">Tous les types d'actions</option>';
+                select.innerHTML = '<option value="all">Tous les types d\'actions</option>';
                 actionsList.forEach(t => {
                     select.innerHTML += `<option value="${t}">${t}</option>`;
                 });
