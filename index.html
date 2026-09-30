@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MilitantSMS - Organisation Actions</title>
+    <title>MilitantSMS - Organisation & Statistiques</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
@@ -145,12 +145,28 @@
         .stats-badge {
             display: inline-block;
             background: #edf2f7;
-            padding: 4px 8px;
+            padding: 6px 10px;
             border-radius: 6px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             font-weight: bold;
             margin-right: 5px;
             margin-top: 5px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .nav-tabs button {
+            background: #e2e8f0;
+            color: var(--text);
+            padding: 8px;
+            font-size: 0.9rem;
+        }
+        .nav-tabs button.active {
+            background: var(--primary);
+            color: white;
         }
     </style>
 </head>
@@ -158,35 +174,26 @@
 
     <header>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Coordination Google Agenda & Campagnes SMS</p>
+        <p style="margin:0; font-size: 0.9rem;">Coordination Google Agenda, Campagnes & Rétrospective</p>
     </header>
 
     <div class="container">
 
-        <!-- ÉVÉNEMENTS DE L'AGENDA GOOGLE & FILTRES -->
+        <!-- STATISTIQUES & RÉTROSPECTIVE -->
+        <div class="card" style="background: #fffaf0; border: 1px solid #feebc8;">
+            <h2 style="color: #c05621;">📊 Rétrospective & Statistiques</h2>
+            <div id="global-stats-container" style="font-size: 0.9rem; color: #2d3748;">
+                Calcul des statistiques en cours...
+            </div>
+        </div>
+
+        <!-- ÉVÉNEMENTS DE L'AGENDA GOOGLE -->
         <div class="card">
             <h2>📅 Actions de l'Agenda Google</h2>
             
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                <div>
-                    <label style="font-size: 0.8rem; color: var(--gray);">Mode d'affichage :</label>
-                    <select id="filter-mode" onchange="toggleFilterMode()" style="margin-bottom:0; font-size: 0.9rem; background: #fff;">
-                        <option value="upcoming">⏳ Actions à venir (Futur)</option>
-                        <option value="range">📅 Filtrer par période personnalisée</option>
-                        <option value="all">📜 Tout l'historique</option>
-                    </select>
-                </div>
-
-                <div id="date-range-container" style="display: none; gap: 10px; margin-top: 5px;">
-                    <div style="flex:1;">
-                        <label style="font-size: 0.8rem;">Du :</label>
-                        <input type="date" id="filter-start" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem;">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="font-size: 0.8rem;">Au :</label>
-                        <input type="date" id="filter-end" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.9rem;">
-                    </div>
-                </div>
+            <div class="nav-tabs">
+                <button id="tab-upcoming" class="active" onclick="switchTab('upcoming')">⏳ Actions à venir</button>
+                <button id="tab-past" onclick="switchTab('past')">📜 Historique / Passé</button>
             </div>
 
             <div id="calendar-events-container">
@@ -194,10 +201,10 @@
             </div>
         </div>
 
-        <!-- CONFIGURATION DES MESSAGES TYPES PAR CATÉGORIE -->
+        <!-- CONFIGURATION DES MESSAGES TYPES -->
         <div class="card">
             <h2>💬 Messages Types par Catégorie</h2>
-            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Utilise les balises exactes : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
+            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises disponibles : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
             <div style="margin-bottom: 15px;">
                 <label>Catégorie :</label>
                 <select id="template-cat" style="background:#fff;">
@@ -230,7 +237,7 @@
             <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
         </div>
 
-        <!-- GESTION DES CAMPAGNES PAR ÉVÉNEMENT -->
+        <!-- GESTION DES CAMPAGNES -->
         <div class="card" id="campaigns-card" style="display:none;">
             <h2>📋 Suivi des Campagnes d'Actions</h2>
             <div id="campaigns-container"></div>
@@ -263,11 +270,18 @@
         let campaigns = {};
         let calendarEvents = [];
         let activeFilterStatus = {};
+        let currentTab = 'upcoming'; // 'upcoming' ou 'past'
 
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
-        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderCampaigns(); } });
-        db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendarEvents(); } });
+        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
+        db.ref('calendarEvents').on('value', (snap) => { 
+            if(snap.val()) { 
+                calendarEvents = snap.val(); 
+                calendarEvents.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                renderUI(); 
+            } 
+        });
 
         function saveData() {
             db.ref('templates').set(templates);
@@ -281,6 +295,45 @@
             renderMilitants();
             renderCalendarEvents();
             renderCampaigns();
+            renderGlobalStats();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-upcoming').className = (tab === 'upcoming') ? 'active' : '';
+            document.getElementById('tab-past').className = (tab === 'past') ? 'active' : '';
+            renderCalendarEvents();
+        }
+
+        function renderGlobalStats() {
+            const container = document.getElementById('global-stats-container');
+            let totalCampaigns = Object.keys(campaigns).length;
+            let totalYes = 0;
+            let totalNo = 0;
+            let totalPending = 0;
+            let totalContacted = 0;
+
+            for (let id in campaigns) {
+                let camp = campaigns[id];
+                if(camp.queue) {
+                    camp.queue.forEach(item => {
+                        if(item.sentAt) totalContacted++;
+                        if(item.status === 'Participe') totalYes++;
+                        else if(item.status === 'Refus') totalNo++;
+                        else if(item.status === 'En attente de réponse') totalPending++;
+                    });
+                }
+            }
+
+            container.innerHTML = `
+                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                    <span class="stats-badge" style="background:#fff; border:1px solid #cbd5e0;">📂 Campagnes suivies : ${totalCampaigns}</span>
+                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Total Oui : ${totalYes}</span>
+                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Total Non : ${totalNo}</span>
+                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${totalPending}</span>
+                    <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS envoyés : ${totalContacted}</span>
+                </div>
+            `;
         }
 
         function renderTemplates() {
@@ -317,12 +370,6 @@
             });
         }
 
-        function toggleFilterMode() {
-            const mode = document.getElementById('filter-mode').value;
-            document.getElementById('date-range-container').style.display = (mode === 'range') ? 'flex' : 'none';
-            renderCalendarEvents();
-        }
-
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
             if(!calendarEvents || calendarEvents.length === 0) {
@@ -330,29 +377,21 @@
                 return;
             }
 
-            const filterMode = document.getElementById('filter-mode').value;
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = today.getTime();
 
             let filteredEvents = calendarEvents.filter(ev => {
-                // Si l'événement a un timestamp valide, on compare
                 let evTime = ev.timestamp || 0;
-                if (filterMode === 'upcoming') {
+                if (currentTab === 'upcoming') {
                     return evTime >= todayTimestamp;
-                } else if (filterMode === 'range') {
-                    const startStr = document.getElementById('filter-start').value;
-                    const endStr = document.getElementById('filter-end').value;
-                    let matches = true;
-                    if (startStr && evTime < new Date(startStr).setHours(0,0,0,0)) matches = false;
-                    if (endStr && evTime > new Date(endStr).setHours(23,59,59,999)) matches = false;
-                    return matches;
+                } else {
+                    return evTime < todayTimestamp;
                 }
-                return true; // 'all'
             });
 
             if(filteredEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucune action trouvée pour ce filtre.</p>';
+                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucune action ${currentTab === 'upcoming' ? 'à venir' : 'dans l\'historique'}.</p>`;
                 return;
             }
 
@@ -362,7 +401,7 @@
                 const dateTimeStr = ev.time ? `${ev.date} à ${ev.time}` : ev.date;
                 const locationStr = ev.location || 'Lieu non spécifié';
                 const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const eventId = "ev_" + idx;
+                const eventId = "ev_" + (ev.timestamp || idx);
 
                 container.innerHTML += `
                     <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:8px; margin-bottom:10px;">
@@ -396,7 +435,6 @@
                 };
                 saveData();
             }
-            renderCampaigns();
             document.getElementById('campaigns-card').style.display = 'block';
             window.scrollTo({ top: document.getElementById('campaigns-card').offsetTop - 50, behavior: 'smooth' });
         }
@@ -409,6 +447,8 @@
                 document.getElementById('campaigns-card').style.display = 'none';
                 return;
             }
+
+            document.getElementById('campaigns-card').style.display = 'block';
 
             for (let eventId in campaigns) {
                 let camp = campaigns[eventId];
@@ -556,7 +596,7 @@
             const cat = select.value;
             const list = templates[cat];
             if(!list || list.length === 0) {
-                alert("Aucun message type dans cette catégorie ! Ajoute-en un dans la section prévue.");
+                alert("Aucun message type dans cette catégorie !");
                 return;
             }
             const randomTpl = list[Math.floor(Math.random() * list.length)];
