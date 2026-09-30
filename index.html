@@ -180,9 +180,9 @@
 
         .tag {
             display: inline-block;
-            padding: 3px 7px;
+            padding: 4px 10px;
             border-radius: 6px;
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             font-weight: bold;
             color: white;
         }
@@ -239,17 +239,31 @@
         .view-section { display: none; }
         .view-section.active { display: block; }
 
-        /* MODALE DE SELECTION DE MILITANTS */
+        /* MODALE PROPRE ET BIEN ALIGNÉE */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 2000;
+            padding: 15px; box-sizing: border-box;
         }
         .modal.open { display: flex; }
         .modal-content {
-            background: white; width: 92%; max-width: 520px; max-height: 85vh; border-radius: 12px;
+            background: white; width: 100%; max-width: 520px; max-height: 85vh; border-radius: 14px;
             padding: 20px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            box-sizing: border-box;
         }
-        .modal-body { overflow-y: auto; flex: 1; margin: 10px 0; padding-right: 5px; }
+        .modal-body { 
+            overflow-y: auto; flex: 1; margin: 12px 0; padding: 5px; 
+            border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;
+        }
+        .modal-item-row {
+            display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+            background: #ffffff; border: 1px solid #edf2f7; border-radius: 8px; margin-bottom: 8px;
+            cursor: pointer; transition: background 0.15s;
+        }
+        .modal-item-row:hover { background: #edf2f7; }
+        .modal-item-row input[type="checkbox"] {
+            width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary);
+        }
     </style>
 </head>
 <body>
@@ -273,37 +287,37 @@
         <button id="nav-btn-stats" class="drawer-nav-item" onclick="switchView('stats')">📊 Statistiques</button>
     </nav>
 
-    <!-- MODALE DE SELECTION DE MILITANTS (EN 2 ÉTAPES) -->
+    <!-- MODALE DE SELECTION PROPRE EN 2 ÉTAPES -->
     <div id="militant-modal" class="modal">
         <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 8px; margin-bottom: 10px;">
-                <h3 id="modal-title" style="margin:0; color:var(--primary-dark); font-size: 1.1rem;">Sélectionner les militants</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 10px;">
+                <h3 id="modal-title" style="margin:0; color:var(--primary-dark); font-size: 1.15rem;">Sélectionner les militants</h3>
                 <button onclick="closeMilitantModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--gray); width:auto; padding:0;">✕</button>
             </div>
 
             <!-- ÉTAPE 1 : SELECTION DES TAGS -->
-            <div id="modal-step-tags" style="display:block;">
-                <label style="font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px;">Étape 1 : Cochez un ou plusieurs tags / entreprises (ou laissez tout décoché pour voir tout le monde) :</label>
+            <div id="modal-step-tags" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
+                <p style="font-size:0.85rem; color:var(--gray); margin:0 0 10px 0;"><strong>Étape 1 :</strong> Cochez un ou plusieurs tags/entreprises (laissez tout décoché pour inclure tout le monde) :</p>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                    <button onclick="toggleSelectAllTags(true)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout cocher</button>
-                    <button onclick="toggleSelectAllTags(false)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout décocher</button>
+                    <button onclick="toggleSelectAllTags(true)" class="btn-secondary" style="padding:8px; font-size:0.8rem;">Tout cocher</button>
+                    <button onclick="toggleSelectAllTags(false)" class="btn-secondary" style="padding:8px; font-size:0.8rem;">Tout décocher</button>
                 </div>
-                <div id="modal-tags-checkboxes-container" class="modal-body" style="max-height: 250px; border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:#f8fafc; margin-bottom: 15px;"></div>
-                <button onclick="goToModalMilitantsStep()" style="background:var(--info);">Suivant : Choisir les militants ➔</button>
+                <div id="modal-tags-checkboxes-container" class="modal-body"></div>
+                <button onclick="goToModalMilitantsStep()" style="background:var(--info); margin-top:5px;">Suivant : Choisir les militants ➔</button>
             </div>
 
             <!-- ÉTAPE 2 : SELECTION DES MILITANTS -->
             <div id="modal-step-militants" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:5px 10px; font-size:0.75rem; background:var(--gray);">⬅️ Retour aux tags</button>
-                    <div style="display: flex; gap: 5px;">
-                        <button onclick="toggleSelectAllMilitants(true)" class="btn-secondary" style="padding:5px 8px; font-size:0.75rem;">Tout cocher</button>
-                        <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:5px 8px; font-size:0.75rem;">Tout décocher</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅️ Retour aux tags</button>
+                    <div style="display: flex; gap: 6px;">
+                        <button onclick="toggleSelectAllMilitants(true)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout cocher</button>
+                        <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout décocher</button>
                     </div>
                 </div>
-                <input type="text" id="modal-search" placeholder="Rechercher par nom, ville..." oninput="renderModalMilitantsList()" style="margin-bottom:8px; font-size:0.85rem;">
-                <div class="modal-body" id="modal-militants-list" style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:#fff; margin-bottom: 10px;"></div>
-                <div style="display: flex; gap: 10px;">
+                <input type="text" id="modal-search" placeholder="🔍 Rechercher par nom, ville..." oninput="renderModalMilitantsList()" style="margin-bottom:10px; font-size:0.85rem;">
+                <div class="modal-body" id="modal-militants-list" style="background:#fff;"></div>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
                     <button onclick="closeMilitantModal()" class="btn-secondary" style="background:var(--gray);">Annuler</button>
                     <button onclick="confirmCampaignSelection()">Valider et enregistrer</button>
                 </div>
@@ -679,7 +693,7 @@
             switchView('campaigns');
         }
 
-        // --- GESTION DE LA MODALE EN 2 ETAPES ---
+        // --- GESTION DE LA MODALE EN 2 ETAPES PROPRE ---
         function openMilitantModalForEvent(eventId, actionName, actionDate, rawDateStr, actionLocation, timestamp) {
             if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
             modalTargetEventId = eventId;
@@ -703,7 +717,7 @@
         }
 
         function renderModalTagsStep() {
-            document.getElementById('modal-step-tags').style.display = 'block';
+            document.getElementById('modal-step-tags').style.display = 'flex';
             document.getElementById('modal-step-militants').style.display = 'none';
 
             let container = document.getElementById('modal-tags-checkboxes-container');
@@ -712,13 +726,13 @@
             let html = '';
             companies.forEach((comp, idx) => {
                 html += `
-                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-weight:normal; font-size:0.85rem; cursor:pointer;">
+                    <div class="modal-item-row" onclick="const cb=this.querySelector('input'); cb.checked=!cb.checked;">
                         <input type="checkbox" class="modal-tag-checkbox" value="${comp}">
                         <span class="tag bg-info">${comp}</span>
-                    </label>`;
+                    </div>`;
             });
             if(companies.length === 0) {
-                html = '<p style="font-size:0.8rem; color:var(--gray); text-align:center;">Aucun tag / entreprise trouvé dans les militants.</p>';
+                html = '<p style="font-size:0.85rem; color:var(--gray); text-align:center; padding:20px;">Aucun tag / entreprise trouvé dans les militants.</p>';
             }
             container.innerHTML = html;
         }
@@ -737,7 +751,7 @@
 
         function backToModalTagsStep() {
             document.getElementById('modal-step-militants').style.display = 'none';
-            document.getElementById('modal-step-tags').style.display = 'block';
+            document.getElementById('modal-step-tags').style.display = 'flex';
         }
 
         function renderModalMilitantsList() {
@@ -747,7 +761,6 @@
 
             let filter = searchInput ? searchInput.value.toLowerCase() : '';
 
-            // Récupérer les tags sélectionnés à l'étape 1
             let selectedTags = [];
             document.querySelectorAll('.modal-tag-checkbox:checked').forEach(cb => selectedTags.push(cb.value));
 
@@ -758,7 +771,6 @@
 
             let html = '';
             militants.forEach((m, idx) => {
-                // Si des tags ont été sélectionnés, on ne garde que les militants ayant l'un de ces tags
                 if(selectedTags.length > 0 && (!m.company || !selectedTags.includes(m.company))) return;
 
                 let fullName = `${m.name} ${m.lastname || ''} ${m.company || ''} ${m.city || ''} ${m.phone}`.toLowerCase();
@@ -767,16 +779,19 @@
                 let isAlreadyIn = existingPhones.includes(cleanPhone(m.phone));
                 let compBadge = m.company ? ` <span class="tag bg-info">${m.company}</span>` : '';
                 let cityStr = m.city ? ` (${m.city})` : '';
+                let displayName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
 
                 html += `
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #edf2f7; font-size: 0.85rem;">
-                        <label style="display: flex; align-items: center; gap: 8px; margin:0; cursor:pointer; flex:1;">
-                            <input type="checkbox" class="modal-militant-checkbox" value="${idx}" ${isAlreadyIn ? 'disabled' : 'checked'}>
-                            <div><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge}${cityStr} <span style="color:var(--gray);">(${m.phone})</span> ${isAlreadyIn ? '<em>(déjà dedans)</em>' : ''}</div>
-                        </label>
+                    <div class="modal-item-row" onclick="const cb=this.querySelector('input'); if(!cb.disabled) cb.checked=!cb.checked;">
+                        <input type="checkbox" class="modal-militant-checkbox" value="${idx}" ${isAlreadyIn ? 'disabled' : 'checked'}>
+                        <div style="flex:1; font-size:0.9rem;">
+                            <strong>${displayName}</strong> ${compBadge}${cityStr} 
+                            <span style="color:var(--gray);">(${m.phone})</span>
+                            ${isAlreadyIn ? '<em style="color:var(--danger); font-size:0.75rem; margin-left:5px;">(déjà dedans)</em>' : ''}
+                        </div>
                     </div>`;
             });
-            container.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray); text-align:center;">Aucun militant ne correspond aux critères.</p>';
+            container.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray); text-align:center; padding:20px;">Aucun militant ne correspond aux critères.</p>';
         }
 
         function toggleSelectAllMilitants(select) {
@@ -999,7 +1014,6 @@
 
             let currentSelected = document.getElementById('stat-filter-val')?.value || 'all';
 
-            // ---- VUE 1 : PAR DATE (avec Calendrier) ----
             if (currentStatTab === 'date') {
                 filterLabel.innerText = "Filtrer par date (Calendrier) :";
                 inputWrapper.innerHTML = `<input type="date" id="stat-filter-val" value="${currentSelected === 'all' ? '' : currentSelected}" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">`;
@@ -1033,7 +1047,6 @@
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette date.</p>';
             }
 
-            // ---- VUE 2 : PAR ACTION ----
             else if (currentStatTab === 'action') {
                 filterLabel.innerText = "Filtrer par action :";
                 let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Toutes les actions</option>`;
@@ -1066,7 +1079,6 @@
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
             }
 
-            // ---- VUE 3 : PAR MILITANT ----
             else if (currentStatTab === 'militant') {
                 filterLabel.innerText = "Filtrer par militant :";
                 let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Tous les militants</option>`;
@@ -1120,7 +1132,6 @@
             }
         }
 
-        // --- EXPORT CSV DES STATISTIQUES ---
         function exportCurrentStatsCSV() {
             let csvContent = "data:text/csv;charset=utf-8,";
             
@@ -1196,7 +1207,6 @@
             document.body.removeChild(link);
         }
 
-        // --- MILITANTS & NORMALISATION ROBUSTE CSV ---
         function cleanPhone(phone) {
             if(!phone) return "";
             let cleaned = phone.replace(/[^0-9+]/g, '');
