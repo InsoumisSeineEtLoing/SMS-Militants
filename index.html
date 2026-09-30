@@ -196,6 +196,18 @@
                 <button id="tab-past" onclick="switchTab('past')">📜 Historique / Passé</button>
             </div>
 
+            <!-- Sélecteur de période (calendrier) -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <div style="flex:1;">
+                    <label style="font-size: 0.8rem;">Filtrer du :</label>
+                    <input type="date" id="filter-start" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;">
+                </div>
+                <div style="flex:1;">
+                    <label style="font-size: 0.8rem;">Au :</label>
+                    <input type="date" id="filter-end" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;">
+                </div>
+            </div>
+
             <div id="calendar-events-container">
                 <p style="font-size:0.85rem; color: var(--gray);">Chargement des actions...</p>
             </div>
@@ -270,7 +282,7 @@
         let campaigns = {};
         let calendarEvents = [];
         let activeFilterStatus = {};
-        let currentTab = 'upcoming'; // 'upcoming' ou 'past'
+        let currentTab = 'upcoming';
 
         db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
         db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
@@ -278,7 +290,6 @@
         db.ref('calendarEvents').on('value', (snap) => { 
             if(snap.val()) { 
                 calendarEvents = snap.val(); 
-                calendarEvents.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
                 renderUI(); 
             } 
         });
@@ -327,11 +338,11 @@
 
             container.innerHTML = `
                 <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    <span class="stats-badge" style="background:#fff; border:1px solid #cbd5e0;">📂 Campagnes suivies : ${totalCampaigns}</span>
-                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Total Oui : ${totalYes}</span>
-                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Total Non : ${totalNo}</span>
-                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${totalPending}</span>
-                    <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS envoyés : ${totalContacted}</span>
+                    <span class="stats-badge" style="background:#fff; border:1px solid #cbd5e0;">📂 Campagnes : ${totalCampaigns}</span>
+                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span>
+                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span>
+                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${totalPending}</span>
+                    <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>
                 </div>
             `;
         }
@@ -381,17 +392,38 @@
             today.setHours(0, 0, 0, 0);
             const todayTimestamp = today.getTime();
 
+            const startStr = document.getElementById('filter-start').value;
+            const endStr = document.getElementById('filter-end').value;
+            let startTime = startStr ? new Date(startStr).setHours(0,0,0,0) : null;
+            let endTime = endStr ? new Date(endStr).setHours(23,59,59,999) : null;
+
             let filteredEvents = calendarEvents.filter(ev => {
                 let evTime = ev.timestamp || 0;
+                
+                // Filtre par onglet (À venir vs Passé)
+                if (currentTab === 'upcoming' && evTime < todayTimestamp) return false;
+                if (currentTab === 'past' && evTime >= todayTimestamp) return false;
+
+                // Filtre par calendrier / période si renseigné
+                if (startTime && evTime < startTime) return false;
+                if (endTime && evTime > endTime) return false;
+
+                return true;
+            });
+
+            // Tri : Chronologique pour le futur (du plus proche au plus lointain), Inversé pour le passé (du plus récent au plus ancien)
+            filteredEvents.sort((a, b) => {
+                let tA = a.timestamp || 0;
+                let tB = b.timestamp || 0;
                 if (currentTab === 'upcoming') {
-                    return evTime >= todayTimestamp;
+                    return tA - tB; // Le plus proche en premier
                 } else {
-                    return evTime < todayTimestamp;
+                    return tB - tA; // Le plus récent (ex: 2025/2024 proche) en premier
                 }
             });
 
             if(filteredEvents.length === 0) {
-                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucune action ${currentTab === 'upcoming' ? 'à venir' : 'dans l\'historique'}.</p>`;
+                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucune action ${currentTab === 'upcoming' ? 'à venir' : 'dans l\'historique'} pour cette période.</p>`;
                 return;
             }
 
