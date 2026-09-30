@@ -5,14 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMS Militants - Coordination & Statistiques</title>
     
-    <!-- Favicon et Icônes tactiles renforcées pour mobile -->
+    <!-- Favicon et Icônes -->
     <link rel="icon" type="image/png" href="app-icon.png">
     <link rel="apple-touch-icon" href="app-icon.png">
     <link rel="apple-touch-icon-precomposed" href="app-icon.png">
     <meta name="msapplication-TileImage" content="app-icon.png">
     
-    <!-- Manifeste PWA -->
-    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{&quot;name&quot;:&quot;SMS Militants&quot;,&quot;short_name&quot;:&quot;SMS Militants&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#f4f6f9&quot;,&quot;theme_color&quot;:&quot;#e53935&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;app-icon.png&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/png&quot;}]}">
+    <!-- Manifeste PWA propre -->
+    <link rel="manifest" href='data:application/manifest+json;charset=utf-8,{"name":"SMS Militants","short_name":"SMS Militants","start_url":".","display":"standalone","background_color":"#f4f6f9","theme_color":"#e53935","icons":[{"src":"app-icon.png","sizes":"512x512","type":"image/png"}]}'>
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -491,7 +491,6 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Gestion de l'authentification Google
         auth.onAuthStateChanged((user) => {
             const loginOverlay = document.getElementById('login-overlay');
             if (user) {
@@ -506,10 +505,9 @@
             const provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider).then((result) => {
                 const user = result.user;
-                // Sécurité : Seul cet email est autorisé à accéder à l'application
                 if (user.email !== "insoumisud77@gmail.com") {
                     alert("Accès refusé : ce compte Google n'est pas autorisé.");
-                    auth.signOut(); // Déconnexion immédiate
+                    auth.signOut();
                 }
             }).catch((error) => {
                 alert("Erreur de connexion : " + error.message);
@@ -674,7 +672,7 @@
                 });
 
                 container.innerHTML += `<div style="margin-bottom:15px; background:#f7fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
-                    <div style="display:flex; justify-size:space-between; align-items:center; border-bottom:1px solid #cbd5e0; padding-bottom:5px; margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #cbd5e0; padding-bottom:5px; margin-bottom:8px;">
                         <strong style="color:var(--primary-dark); font-size:0.95rem;">${catLabel}</strong>
                         <button class="delete-btn" style="font-size:0.8rem;" onclick="deleteCategory('${cat}')">Supprimer catégorie</button>
                     </div>
@@ -818,17 +816,15 @@
 
         function getEventStatsHTML(eventId) {
             const s = getEventStats(eventId);
-            if (s.total === 0) return `<span style="font-size:0.8rem; color:var(--gray);">Aucune campagne liée.</span>`;
+            if (s.total === 0) return '<span style="font-size:0.8rem; color:var(--gray);">Aucune campagne liée.</span>';
             
-            return `
-                <div style="margin-top:6px; font-size:0.8rem;">
-                    <span class="stats-badge bg-info" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'all');">Total: ${s.total}</span>
-                    <span class="stats-badge bg-warning" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'pending');">⌛ Attente: ${s.pending}</span>
-                    <span class="stats-badge bg-success" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'confirmed');">✅ Venus: ${s.confirmed}</span>
-                    <span class="stats-badge bg-danger" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'declined');">❌ Absents: ${s.declined}</span>
-                    <span class="stats-badge bg-gray" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'no_answer');">❓ Sans rép.: ${s.no_answer}</span>
-                </div>
-            `;
+            return '<div style="margin-top:6px; font-size:0.8rem;">' +
+                '<span class="stats-badge bg-info" style="color:white;" onclick="switchView(\'campaigns\'); filterCampaignByStatus(\'' + eventId + '\', \'all\');">Total: ' + s.total + '</span>' +
+                '<span class="stats-badge bg-warning" style="color:white;" onclick="switchView(\'campaigns\'); filterCampaignByStatus(\'' + eventId + '\', \'pending\');">⌛ Attente: ' + s.pending + '</span>' +
+                '<span class="stats-badge bg-success" style="color:white;" onclick="switchView(\'campaigns\'); filterCampaignByStatus(\'' + eventId + '\', \'confirmed\');">✅ Venus: ' + s.confirmed + '</span>' +
+                '<span class="stats-badge bg-danger" style="color:white;" onclick="switchView(\'campaigns\'); filterCampaignByStatus(\'' + eventId + '\', \'declined\');">❌ Absents: ' + s.declined + '</span>' +
+                '<span class="stats-badge bg-gray" style="color:white;" onclick="switchView(\'campaigns\'); filterCampaignByStatus(\'' + eventId + '\', \'no_answer\');">❓ Sans rép.: ' + s.no_answer + '</span>' +
+            '</div>';
         }
 
         function filterCampaignByStatus(eventId, status) {
@@ -890,7 +886,6 @@
 
             document.getElementById('modal-title').innerText = `Campagne pour : ${ev.title}`;
             
-            // Étape 1 : Récupérer tous les tags/entreprises uniques des militants
             const tags = Array.from(new Set(militants.map(m => m.company).filter(Boolean))).sort();
             const tagsContainer = document.getElementById('modal-tags-checkboxes-container');
             tagsContainer.innerHTML = '';
@@ -920,7 +915,6 @@
         function goToModalMilitantsStep() {
             const selectedTags = Array.from(document.querySelectorAll('.modal-tag-checkbox:checked')).map(cb => cb.value);
             
-            // On coche par défaut tous les militants qui correspondent aux tags choisis
             const campaignKey = 'event_' + modalTargetEventId;
             const existingCamp = campaigns[campaignKey] || {};
             const existingStatuses = existingCamp.statuses || {};
@@ -983,7 +977,6 @@
                 };
             }
 
-            // Conserver les statuts existants et ajouter 'pending' pour les nouveaux
             let updatedStatuses = {};
             selectedMilitantIds.forEach(id => {
                 updatedStatuses[id] = campaigns[campaignKey].statuses?.[id] || 'pending';
@@ -1055,7 +1048,6 @@
                     return { m, status };
                 });
 
-                // Filtrage
                 if(currentFilter !== 'all') {
                     militantEntries = militantEntries.filter(item => item.status === currentFilter);
                 }
@@ -1066,7 +1058,6 @@
                     });
                 }
 
-                // Tri
                 militantEntries.sort((a, b) => {
                     if(currentSort === 'status') return a.status.localeCompare(b.status);
                     if(currentSort === 'company') return (a.m.company||'').localeCompare(b.m.company||'');
@@ -1078,7 +1069,6 @@
                     const statusColors = { pending: 'bg-warning', confirmed: 'bg-success', declined: 'bg-danger', no_answer: 'bg-gray' };
                     const statusLabels = { pending: '⌛ En attente', confirmed: '✅ Présent', declined: '❌ Absent', no_answer: '❓ Sans réponse' };
 
-                    // Génération du lien SMS
                     let catKey = 'first';
                     if (status === 'pending') catKey = 'reminder1';
                     else if (status === 'no_answer') catKey = 'reminder2';
@@ -1159,14 +1149,12 @@
             const pStart = document.getElementById('stat-period-start')?.value;
             const pEnd = document.getElementById('stat-period-end')?.value;
 
-            // Filtrage global par période
             let filteredCampaigns = Object.entries(campaigns).filter(([k, c]) => {
                 if(pStart && c.date < pStart) return false;
                 if(pEnd && c.date > pEnd) return false;
                 return true;
             });
 
-            // Mise à jour de l'interface des filtres spécifiques selon l'onglet actif
             if(filterWrapper) {
                 if(currentStatTab === 'date') {
                     filterLabel.innerText = "Filtrer par statut :";
@@ -1188,7 +1176,6 @@
                 }
             }
 
-            // Calcul des totaux généraux
             let totalEvents = filteredCampaigns.length;
             let totalMobilizations = 0;
             let totalConfirmed = 0;
@@ -1218,7 +1205,6 @@
 
             container.innerHTML = '';
 
-            // 1. ONGLET PAR DATE
             if(currentStatTab === 'date') {
                 filteredCampaigns.sort((a, b) => b[1].date.localeCompare(a[1].date));
                 filteredCampaigns.forEach(([k, c]) => {
@@ -1242,7 +1228,6 @@
                     }
                 });
             }
-            // 2. ONGLET PAR ACTION
             else if(currentStatTab === 'action') {
                 const search = (document.getElementById('stat-action-search')?.value || '').toLowerCase();
                 let groupedByAction = {};
@@ -1276,7 +1261,6 @@
                     `;
                 });
             }
-            // 3. ONGLET PAR MILITANT
             else if(currentStatTab === 'militant') {
                 const search = (document.getElementById('stat-militant-search')?.value || '').toLowerCase();
                 let mStats = {};
