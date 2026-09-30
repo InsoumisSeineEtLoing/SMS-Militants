@@ -283,13 +283,19 @@
         let activeFilterStatus = {};
         let currentTab = 'upcoming';
 
-        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
-        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
-        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
+        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderTemplates(); } });
+        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderMilitants(); } });
+        db.ref('campaigns').on('value', (snap) => { 
+            // On ne met à jour que si les données distantes changent, sans perturber la saisie active
+            if(snap.val()) { 
+                campaigns = snap.val(); 
+                renderCampaigns(); 
+            } 
+        });
         db.ref('calendarEvents').on('value', (snap) => { 
             if(snap.val()) { 
                 calendarEvents = snap.val(); 
-                renderUI(); 
+                renderCalendarEvents(); 
             } 
         });
 
@@ -297,7 +303,6 @@
             db.ref('templates').set(templates);
             db.ref('militants').set(militants);
             db.ref('campaigns').set(campaigns);
-            renderUI();
         }
 
         function renderUI() {
@@ -457,7 +462,7 @@
             window.scrollTo({ top: document.getElementById('campaigns-card').offsetTop - 50, behavior: 'smooth' });
         }
 
-        function updateCampaignDetails(eventId) {
+        function saveCampaignDetails(eventId) {
             const newName = document.getElementById(`camp_name_${eventId}`).value.trim();
             const newDate = document.getElementById(`camp_date_${eventId}`).value.trim();
             const newLocation = document.getElementById(`camp_loc_${eventId}`).value.trim();
@@ -467,6 +472,8 @@
                 campaigns[eventId].date = newDate || campaigns[eventId].date;
                 campaigns[eventId].location = newLocation;
                 saveData();
+                alert("Modifications enregistrées !");
+                renderCampaigns();
             }
         }
 
@@ -577,21 +584,22 @@
                             <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.8rem;">Supprimer campagne</button>
                         </h3>
 
-                        <!-- Champs modifiables directement -->
+                        <!-- Champs modifiables sans perdre le focus -->
                         <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px;">
                             <label style="font-size:0.75rem; color:var(--gray);">Modifier le titre de l'action (pour les SMS) :</label>
-                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:8px; font-size:0.9rem; background:#fff;">
+                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" style="margin-bottom:8px; font-size:0.9rem; background:#fff;">
                             
-                            <div style="display:flex; gap:10px;">
+                            <div style="display:flex; gap:10px; margin-bottom: 8px;">
                                 <div style="flex:1;">
                                     <label style="font-size:0.75rem; color:var(--gray);">Date / Heure :</label>
-                                    <input type="text" id="camp_date_${eventId}" value="${camp.date}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                                    <input type="text" id="camp_date_${eventId}" value="${camp.date}" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
                                 </div>
                                 <div style="flex:1;">
                                     <label style="font-size:0.75rem; color:var(--gray);">Lieu :</label>
-                                    <input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                                    <input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
                                 </div>
                             </div>
+                            <button onclick="saveCampaignDetails('${eventId}')" class="btn-secondary" style="padding: 6px; font-size: 0.8rem; background: var(--info);">💾 Enregistrer les modifications</button>
                         </div>
                         
                         <div style="margin-bottom:12px;">
@@ -604,14 +612,14 @@
                         </div>
 
                         <div style="margin-bottom: 12px;">
-                            <label style="font-size:0.8rem;">Filtrer l'affichage :</label>
+                            <label style="font-size:0.80rem;">Filtrer l'affichage :</label>
                             <select onchange="filterCampaignStatus('${eventId}', this.value)" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
                                 <option value="all" ${currentFilter==='all'?'selected':''}>Tous les militants (${camp.queue.length})</option>
                                 <option value="À contacter" ${currentFilter==='À contacter'?'selected':''}>À contacter (${stats.contacter})</option>
                                 <option value="En attente de réponse" ${currentFilter==='En attente de réponse'?'selected':''}>En attente (${stats.attente})</option>
                                 <option value="Participe" ${currentFilter==='Participe'?'selected':''}>Oui (${stats.oui})</option>
                                 <option value="Refus" ${currentFilter==='Refus'?'selected':''}>Non (${stats.non})</option>
-                                <option value="relancer" ${currentFilter==='relancer'?'selected':''}>⚠️ À relancer (${stats.relancer})</option>
+                                <option value="relancer" ${currentFilter==='relancer'?'selected':''}>⚠️️ À relancer (${stats.relancer})</option>
                                 <option value="rappel" ${currentFilter==='rappel'?'selected':''}>⏰ Rappel veille (${stats.rappel})</option>
                             </select>
                         </div>
