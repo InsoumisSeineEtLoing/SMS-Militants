@@ -276,7 +276,10 @@
     <!-- MODALE DE SELECTION DE MILITANTS -->
     <div id="militant-modal" class="modal">
         <div class="modal-content">
-            <h3 id="modal-title" style="margin-top:0; color:var(--primary-dark);">Sélectionner les militants</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 8px; margin-bottom: 10px;">
+                <h3 id="modal-title" style="margin:0; color:var(--primary-dark); font-size: 1.1rem;">Sélectionner les militants</h3>
+                <button onclick="closeMilitantModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--gray); width:auto; padding:0;">✕</button>
+            </div>
             <div style="display: flex; gap: 8px; margin-bottom: 10px;">
                 <input type="text" id="modal-search" placeholder="Rechercher par nom, entreprise, ville..." oninput="renderModalMilitants()" style="margin-bottom:0; font-size:0.85rem;">
             </div>
@@ -377,12 +380,20 @@
         <div id="view-stats" class="view-section">
             <div class="card" style="background: #fffaf0; border: 1px solid #feebc8;">
                 <h2 style="color: #c05621;">📊 Rétrospective & Statistiques</h2>
-                <div style="margin-bottom:15px;">
-                    <label style="font-size:0.8rem;">Filtrer par action :</label>
-                    <select id="stat-filter-action" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">
-                        <option value="all">Toutes les actions</option>
+                
+                <div class="nav-tabs" style="margin-bottom: 15px;">
+                    <button id="tab-stat-date" class="active" onclick="switchStatTab('date')">📅 Par Date</button>
+                    <button id="tab-stat-action" onclick="switchStatTab('action')">📌 Par Action</button>
+                    <button id="tab-stat-militant" onclick="switchStatTab('militant')">👤 Par Militant</button>
+                </div>
+
+                <div id="stat-filter-container" style="margin-bottom:15px;">
+                    <label style="font-size:0.8rem;" id="stat-filter-label">Filtrer :</label>
+                    <select id="stat-filter-select" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">
+                        <option value="all">Tous</option>
                     </select>
                 </div>
+
                 <div id="global-stats-container" style="font-size: 0.9rem; color: #2d3748; margin-bottom: 20px;"></div>
                 <div id="detailed-stats-container"></div>
             </div>
@@ -418,6 +429,7 @@
         let activeFilterStatus = {};
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
+        let currentStatTab = 'date';
 
         let modalTargetEventId = null;
 
@@ -483,6 +495,14 @@
             document.getElementById('tab-camp-current').className = (tab === 'current') ? 'active' : '';
             document.getElementById('tab-camp-past').className = (tab === 'past') ? 'active' : '';
             renderCampaigns();
+        }
+
+        function switchStatTab(tab) {
+            currentStatTab = tab;
+            document.getElementById('tab-stat-date').className = (tab === 'date') ? 'active' : '';
+            document.getElementById('tab-stat-action').className = (tab === 'action') ? 'active' : '';
+            document.getElementById('tab-stat-militant').className = (tab === 'militant') ? 'active' : '';
+            renderDetailedStats();
         }
 
         function renderUI() {
@@ -615,11 +635,19 @@
                 const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const eventId = "ev_" + (ev.timestamp || idx);
 
+                // Vérifier si une campagne existe pour cet événement
+                let activeCampBadge = '';
+                if(campaigns[eventId]) {
+                    let totalM = campaigns[eventId].queue ? campaigns[eventId].queue.length : 0;
+                    activeCampBadge = `<div style="margin-top:6px;"><span class="tag bg-success" style="font-size:0.75rem;">📋 Campagne active (${totalM} militants)</span></div>`;
+                }
+
                 html += `
                     <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:8px; margin-bottom:10px;">
                         <div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${ev.summary}</div>
                         <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">📅 ${dateTimeStr} <br>📍 ${locationStr || 'Lieu non spécifié'}</div>
-                        <button onclick="openMilitantModalForEvent('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}', ${ev.timestamp || 0})" style="padding:8px 12px; font-size:0.85rem;">📂 Lancer la campagne SMS</button>
+                        ${activeCampBadge}
+                        <button onclick="openMilitantModalForEvent('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}', ${ev.timestamp || 0})" style="padding:8px 12px; font-size:0.85rem; margin-top:8px;">📂 Lancer la campagne SMS</button>
                     </div>`;
             });
             html += '</div>';
@@ -912,55 +940,127 @@
         function deleteCampaign(eventId) { if(confirm("Supprimer cette campagne ?")) { delete campaigns[eventId]; saveData(); renderCampaigns(); } }
 
         function renderDetailedStats() {
-            const selectAction = document.getElementById('stat-filter-action');
+            const selectFilter = document.getElementById('stat-filter-select');
+            const filterLabel = document.getElementById('stat-filter-label');
             const globalContainer = document.getElementById('global-stats-container');
             const detailedContainer = document.getElementById('detailed-stats-container');
-            if(!selectAction) return;
+            if(!selectFilter) return;
 
-            let currentSelected = selectAction.value;
-            selectAction.innerHTML = '<option value="all">Toutes les actions</option>';
-            for(let id in campaigns) {
-                selectAction.innerHTML += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].name} (${campaigns[id].date})</option>`;
-            }
+            let currentSelected = selectFilter.value;
+            selectFilter.innerHTML = '<option value="all">Tous</option>';
 
-            let totalYes = 0, totalNo = 0, totalPending = 0, totalContacted = 0, actionDetailsHtml = '';
-            for (let id in campaigns) {
-                if(currentSelected !== 'all' && currentSelected !== id) continue;
-                let camp = campaigns[id];
-                let cYes = 0, cNo = 0, cPending = 0, militantRows = '';
+            // ---- VUE 1 : PAR DATE ----
+            if (currentStatTab === 'date') {
+                filterLabel.innerText = "Filtrer par date :";
+                let dates = [...new Set(Object.values(campaigns).map(c => c.date))].sort();
+                dates.forEach(d => {
+                    selectFilter.innerHTML += `<option value="${d}" ${currentSelected === d ? 'selected' : ''}>${d}</option>`;
+                });
 
-                if(camp.queue) {
-                    camp.queue.forEach(item => {
-                        if(item.sentAt) totalContacted++;
-                        if(item.status === 'Participe') { cYes++; totalYes++; }
-                        else if(item.status === 'Refus') { cNo++; totalNo++; }
-                        else { cPending++; totalPending++; }
-
-                        militantRows += `
-                            <tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
-                                <td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td>
-                                <td style="padding: 6px;">${item.phone}</td>
-                                <td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td>
-                                <td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
-                            </tr>`;
-                    });
-                }
-                actionDetailsHtml += `
-                    <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
-                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 ${camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
+                let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
+                Object.values(campaigns).forEach(camp => {
+                    if (currentSelected !== 'all' && camp.date !== currentSelected) return;
+                    let cYes = 0, cNo = 0, rows = '';
+                    if (camp.queue) {
+                        camp.queue.forEach(item => {
+                            if(item.sentAt) totalContacted++;
+                            if(item.status === 'Participe') { cYes++; totalYes++; }
+                            else if(item.status === 'Refus') { cNo++; totalNo++; }
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                        });
+                    }
+                    html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📅 Date : ${camp.date} — ${camp.name}</h3>
                         <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
-                        <table style="width:100%; border-collapse: collapse; text-align: left;">
-                            <thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead>
-                            <tbody>${militantRows}</tbody>
-                        </table>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
                     </div>`;
+                });
+                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Total Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Total Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS Contactés : ${totalContacted}</span>`;
+                detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette date.</p>';
             }
 
-            globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>`;
-            detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
+            // ---- VUE 2 : PAR ACTION ----
+            else if (currentStatTab === 'action') {
+                filterLabel.innerText = "Filtrer par action :";
+                for(let id in campaigns) {
+                    selectFilter.innerHTML += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].name} (${campaigns[id].date})</option>`;
+                }
+
+                let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
+                for (let id in campaigns) {
+                    if(currentSelected !== 'all' && currentSelected !== id) continue;
+                    let camp = campaigns[id];
+                    let cYes = 0, cNo = 0, rows = '';
+                    if(camp.queue) {
+                        camp.queue.forEach(item => {
+                            if(item.sentAt) totalContacted++;
+                            if(item.status === 'Participe') { cYes++; totalYes++; }
+                            else if(item.status === 'Refus') { cNo++; totalNo++; }
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                        });
+                    }
+                    html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 Action : ${camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
+                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
+                    </div>`;
+                }
+                globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>`;
+                detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
+            }
+
+            // ---- VUE 3 : PAR MILITANT ----
+            else if (currentStatTab === 'militant') {
+                filterLabel.innerText = "Filtrer par militant :";
+                militants.forEach((m, idx) => {
+                    let mName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
+                    selectFilter.innerHTML += `<option value="${m.phone}" ${currentSelected === m.phone ? 'selected' : ''}>${mName} (${m.phone})</option>`;
+                });
+
+                let html = '';
+                militants.forEach(m => {
+                    if (currentSelected !== 'all' && currentSelected !== m.phone) return;
+                    let mPhoneClean = cleanPhone(m.phone);
+                    let historyRows = '';
+                    let mYes = 0, mNo = 0, mParticipations = 0;
+
+                    Object.values(campaigns).forEach(camp => {
+                        if (camp.queue) {
+                            camp.queue.forEach(item => {
+                                if (cleanPhone(item.phone) === mPhoneClean) {
+                                    mParticipations++;
+                                    if (item.status === 'Participe') mYes++;
+                                    if (item.status === 'Refus') mNo++;
+                                    historyRows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
+                                        <td style="padding:6px;"><strong>${camp.name}</strong><br><span style="color:var(--gray); font-size:0.75rem;">${camp.date}</span></td>
+                                        <td style="padding:6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td>
+                                        <td style="padding:6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
+                                    </tr>`;
+                                }
+                            });
+                        }
+                    });
+
+                    let mDisplayName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
+                    let compBadge = m.company ? ` <span class="tag bg-info">${m.company}</span>` : '';
+                    let cityStr = m.city ? ` (${m.city})` : '';
+
+                    html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">👤 ${mDisplayName}${compBadge}${cityStr} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${m.phone})</span></h3>
+                        <div style="margin-bottom:8px;">
+                            <span class="stats-badge">📌 Actions : ${mParticipations}</span>
+                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Participations : ${mYes}</span>
+                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Refus : ${mNo}</span>
+                        </div>
+                        ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce militant.</p>'}
+                    </div>`;
+                });
+                globalContainer.innerHTML = `<span class="stats-badge" style="background:#edf2f7; color:#2d3748;">👥 Total Militants dans le carnet : ${militants.length}</span>`;
+                detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant sélectionné.</p>';
+            }
         }
 
-        // --- MILITANTS, NORMALISATION ROBUSTE & PARCOURS CSV GOOGLE ---
+        // --- MILITANTS & NORMALISATION ROBUSTE CSV ---
         function cleanPhone(phone) {
             if(!phone) return "";
             let cleaned = phone.replace(/[^0-9+]/g, '');
@@ -983,7 +1083,7 @@
 
             let exists = militants.some(m => cleanPhone(m.phone) === phone);
             if(exists) {
-                alert("⚠️️ Ce numéro de téléphone existe déjà dans le carnet !");
+                alert("⚠ Ce numéro de téléphone existe déjà dans le carnet !");
                 return;
             }
 
@@ -1032,7 +1132,6 @@
 
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); renderMilitants(); }
 
-        // Analyseur CSV Google Contacts sur-mesure et robuste
         function parseCSVLine(text) {
             let result = [];
             let cell = '';
@@ -1062,7 +1161,6 @@
                 let dupCount = 0;
                 let noPhoneCount = 0;
 
-                // Récupération des en-têtes (ligne 0)
                 if(lines.length < 2) { alert("Fichier CSV vide ou invalide."); return; }
                 let headers = parseCSVLine(lines[0]);
 
@@ -1083,12 +1181,10 @@
 
                     if(!name || name.toLowerCase().includes('name')) continue;
 
-                    // Recherche d'un numéro de téléphone valide dans TOUTES les colonnes de la ligne
                     let phone = "";
                     for (let j = 0; j < cols.length; j++) {
                         let val = cols[j];
                         if (val && /^[0-9+() \-\.]+$/.test(val) && val.replace(/[^0-9]/g, '').length >= 9) {
-                            // Gérer si Google exporte plusieurs numéros séparés par ":::"
                             let parts = val.split(':::');
                             for (let p of parts) {
                                 let cleaned = cleanPhone(p);
