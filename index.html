@@ -35,37 +35,88 @@
             padding: 1rem;
             text-align: center;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        /* Barre de navigation principale */
-        .main-nav {
-            display: flex;
-            justify-content: center;
-            background: #fff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 0;
-            z-index: 100;
+        header h1 { font-size: 1.2rem; margin: 0; }
+        header p { display: none; }
+        @media(min-width: 600px) {
+            header p { display: block; margin: 0; font-size: 0.85rem; }
+            header { justify-content: space-around; }
         }
-        .main-nav button {
+
+        /* --- MENU BURGER MOBILE --- */
+        .burger-btn {
             background: none;
             border: none;
-            color: var(--gray);
-            font-weight: bold;
-            padding: 15px 20px;
+            color: white;
+            font-size: 1.6rem;
             cursor: pointer;
-            border-bottom: 3px solid transparent;
-            width: auto;
-            border-radius: 0;
-        }
-        .main-nav button.active {
-            color: var(--primary);
-            border-bottom: 3px solid var(--primary);
-            background: #fff5f5;
+            padding: 5px 10px;
         }
 
+        .side-drawer {
+            position: fixed;
+            top: 0;
+            left: -280px;
+            width: 260px;
+            height: 100%;
+            background: #ffffff;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.15);
+            transition: left 0.3s ease;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            padding-top: 20px;
+        }
+
+        .side-drawer.open { left: 0; }
+
+        .drawer-header {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--primary);
+            padding: 0 20px 15px 20px;
+            border-bottom: 1px solid #edf2f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .drawer-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--gray); }
+
+        .drawer-nav-item {
+            background: none;
+            border: none;
+            text-align: left;
+            padding: 15px 20px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+            width: 100%;
+            border-bottom: 1px solid #f7fafc;
+        }
+
+        .drawer-nav-item.active {
+            color: var(--primary);
+            background: #fff5f5;
+            border-left: 4px solid var(--primary);
+        }
+
+        .drawer-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.4);
+            display: none;
+            z-index: 999;
+        }
+        .drawer-overlay.open { display: block; }
+
         .container {
-            max-width: 700px;
+            max-width: 650px;
             margin: 20px auto;
             padding: 0 15px;
         }
@@ -130,8 +181,8 @@
 
         .tag {
             display: inline-block;
-            padding: 3px 8px;
-            border-radius: 4px;
+            padding: 4px 8px;
+            border-radius: 6px;
             font-size: 0.75rem;
             font-weight: bold;
             color: white;
@@ -151,12 +202,7 @@
             margin: 10px 0;
         }
 
-        .actions-flex {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
+        .actions-flex { display: flex; gap: 10px; margin-top: 10px; }
         .list-group { list-style: none; padding: 0; margin: 0; }
         .list-group-item {
             display: flex;
@@ -180,29 +226,16 @@
             margin-top: 5px;
         }
         
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
         .nav-tabs button {
             background: #e2e8f0;
             color: var(--text);
             padding: 8px;
             font-size: 0.9rem;
         }
-        .nav-tabs button.active {
-            background: var(--primary);
-            color: white;
-        }
+        .nav-tabs button.active { background: var(--primary); color: white; }
 
-        /* Conteneur avec défilement pour limiter à 5 éléments */
-        .events-scroll-box {
-            max-height: 480px;
-            overflow-y: auto;
-            padding-right: 5px;
-        }
-
+        .events-scroll-box { max-height: 480px; overflow-y: auto; padding-right: 5px; }
         .view-section { display: none; }
         .view-section.active { display: block; }
     </style>
@@ -210,17 +243,23 @@
 <body>
 
     <header>
+        <button class="burger-btn" onclick="toggleDrawer()">☰</button>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Coordination Google Agenda, Campagnes & Statistiques</p>
+        <p>Coordination & Statistiques</p>
     </header>
 
-    <!-- MENU DE NAVIGATION PRINCIPAL -->
-    <nav class="main-nav">
-        <button id="nav-btn-agenda" class="active" onclick="switchView('agenda')">📅 Agenda</button>
-        <button id="nav-btn-campaigns" onclick="switchView('campaigns')">📋 Campagnes</button>
-        <button id="nav-btn-templates" onclick="switchView('templates')">💬 Messages Types</button>
-        <button id="nav-btn-militants" onclick="switchView('militants')">👥 Militants</button>
-        <button id="nav-btn-stats" onclick="switchView('stats')">📊 Statistiques</button>
+    <!-- MENU COULISSANT (DRAWER) -->
+    <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer()"></div>
+    <nav id="side-drawer" class="side-drawer">
+        <div class="drawer-header">
+            <span>Navigation</span>
+            <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+        </div>
+        <button id="nav-btn-agenda" class="drawer-nav-item active" onclick="switchView('agenda')">📅 Agenda</button>
+        <button id="nav-btn-campaigns" class="drawer-nav-item" onclick="switchView('campaigns')">📋 Campagnes</button>
+        <button id="nav-btn-templates" class="drawer-nav-item" onclick="switchView('templates')">💬 Messages Types</button>
+        <button id="nav-btn-militants" class="drawer-nav-item" onclick="switchView('militants')">👥 Militants</button>
+        <button id="nav-btn-stats" class="drawer-nav-item" onclick="switchView('stats')">📊 Statistiques</button>
     </nav>
 
     <div class="container">
@@ -229,60 +268,46 @@
         <div id="view-agenda" class="view-section active">
             <div class="card">
                 <h2>📅 Actions de l'Agenda Google</h2>
-                
                 <div class="nav-tabs">
-                    <button id="tab-upcoming" class="active" onclick="switchCalendarTab('upcoming')">⏳ Actions à venir</button>
-                    <button id="tab-past" onclick="switchCalendarTab('past')">📜 Historique / Passé</button>
+                    <button id="tab-upcoming" class="active" onclick="switchCalendarTab('upcoming')">⏳ À venir</button>
+                    <button id="tab-past" onclick="switchCalendarTab('past')">📜 Historique</button>
                 </div>
-
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                    <div style="flex:1;">
-                        <label style="font-size: 0.8rem;">Filtrer du :</label>
-                        <input type="date" id="filter-start" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="font-size: 0.8rem;">Au :</label>
-                        <input type="date" id="filter-end" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;">
-                    </div>
+                    <div style="flex:1;"><label style="font-size: 0.8rem;">Du :</label><input type="date" id="filter-start" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;"></div>
+                    <div style="flex:1;"><label style="font-size: 0.8rem;">Au :</label><input type="date" id="filter-end" onchange="renderCalendarEvents()" style="margin-bottom:0; font-size: 0.85rem;"></div>
                 </div>
-
-                <div id="calendar-events-container">
-                    <p style="font-size:0.85rem; color: var(--gray);">Chargement des actions...</p>
-                </div>
+                <div id="calendar-events-container"><p style="font-size:0.85rem; color: var(--gray);">Chargement...</p></div>
             </div>
         </div>
 
         <!-- 2. VUE CAMPAGNES -->
         <div id="view-campaigns" class="view-section">
             <div class="card">
-                <h2>📋 Suivi des Campagnes d'Actions</h2>
-                <div id="campaigns-container">
-                    <p style="font-size:0.85rem; color: var(--gray);">Aucune campagne active pour le moment. Lance une action depuis l'Agenda !</p>
+                <h2>📋 Suivi des Campagnes</h2>
+                <div class="nav-tabs">
+                    <button id="tab-camp-current" class="active" onclick="switchCampaignTab('current')">🔥 En cours</button>
+                    <button id="tab-camp-past" onclick="switchCampaignTab('past')">📁 Passées</button>
                 </div>
+                <div id="campaigns-container"></div>
             </div>
         </div>
 
-        <!-- 3. VUE MESSAGES TYPES & CATÉGORIES -->
+        <!-- 3. VUE MESSAGES TYPES -->
         <div id="view-templates" class="view-section">
             <div class="card">
                 <h2>💬 Gestion des Messages Types</h2>
                 <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
                 
-                <!-- Créer une nouvelle catégorie -->
                 <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
-                    <label style="font-size:0.85rem;">Créer une nouvelle catégorie :</label>
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" id="new-cat-key" placeholder="Nom technique (ex: jour_meme)" style="margin-bottom:0; flex:1;">
-                        <input type="text" id="new-cat-label" placeholder="Libellé (ex: Rappel Jour-même)" style="margin-bottom:0; flex:1;">
-                    </div>
-                    <button onclick="addNewCategory()" class="btn-secondary" style="margin-top:10px; padding: 8px;">Ajouter la catégorie</button>
+                    <label style="font-size:0.85rem;">Ajouter une catégorie (Libellé simple) :</label>
+                    <input type="text" id="new-cat-label" placeholder="Ex: Rappel Jour-même" style="margin-bottom:10px;">
+                    <button onclick="addNewCategory()" class="btn-secondary" style="padding: 8px;">Créer la catégorie</button>
                 </div>
 
-                <!-- Ajouter un message -->
                 <div style="margin-bottom: 15px;">
-                    <label>Catégorie cible :</label>
+                    <label>Sélectionner la catégorie :</label>
                     <select id="template-cat" style="background:#fff;"></select>
-                    <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, on se voit tout à l'heure pour {action} à {lieu} !" style="margin-bottom:10px;">
+                    <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, rdv ce soir pour {action} !" style="margin-bottom:10px;">
                     <button onclick="addTemplate()" class="btn-secondary" style="padding: 8px;">Ajouter le message</button>
                 </div>
                 <div id="templates-list-grouped"></div>
@@ -299,27 +324,23 @@
                     <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 120px;">
                 </div>
                 <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
-                
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
-                    <label>Importer un fichier CSV (Prénom, Nom, Numéro) :</label>
+                    <label>Importer un CSV (Prénom, Nom, Numéro) :</label>
                     <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
                 </div>
-
                 <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
             </div>
         </div>
 
-        <!-- 5. VUE STATISTIQUES & RÉTROSPECTIVE -->
+        <!-- 5. VUE STATISTIQUES -->
         <div id="view-stats" class="view-section">
             <div class="card" style="background: #fffaf0; border: 1px solid #feebc8;">
-                <h2 style="color: #c05621;">📊 Rétrospective & Statistiques Complètes</h2>
-                <div id="stats-filters" style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-                    <div style="flex:1; min-width:200px;">
-                        <label style="font-size:0.8rem;">Filtrer par action :</label>
-                        <select id="stat-filter-action" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">
-                            <option value="all">Toutes les actions</option>
-                        </select>
-                    </div>
+                <h2 style="color: #c05621;">📊 Rétrospective & Statistiques</h2>
+                <div style="margin-bottom:15px;">
+                    <label style="font-size:0.8rem;">Filtrer par action :</label>
+                    <select id="stat-filter-action" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">
+                        <option value="all">Toutes les actions</option>
+                    </select>
                 </div>
                 <div id="global-stats-container" style="font-size: 0.9rem; color: #2d3748; margin-bottom: 20px;"></div>
                 <div id="detailed-stats-container"></div>
@@ -355,10 +376,11 @@
         let calendarEvents = [];
         let activeFilterStatus = {};
         let currentTab = 'upcoming';
+        let currentCampTab = 'current';
 
-        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderUI(); } });
-        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
-        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
+        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderTemplates(); } });
+        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderMilitants(); } });
+        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderCampaigns(); } });
         db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendarEvents(); } });
 
         function saveData() {
@@ -367,11 +389,17 @@
             db.ref('campaigns').set(campaigns);
         }
 
+        function toggleDrawer() {
+            document.getElementById('side-drawer').classList.toggle('open');
+            document.getElementById('drawer-overlay').classList.toggle('open');
+        }
+
         function switchView(viewName) {
             ['agenda', 'campaigns', 'templates', 'militants', 'stats'].forEach(v => {
                 document.getElementById(`view-${v}`).className = (v === viewName) ? 'view-section active' : 'view-section';
-                document.getElementById(`nav-btn-${v}`).className = (v === viewName) ? 'active' : '';
+                document.getElementById(`nav-btn-${v}`).className = (v === viewName) ? 'drawer-nav-item active' : 'drawer-nav-item';
             });
+            toggleDrawer();
             if(viewName === 'stats') renderDetailedStats();
             if(viewName === 'campaigns') renderCampaigns();
         }
@@ -383,6 +411,13 @@
             renderCalendarEvents();
         }
 
+        function switchCampaignTab(tab) {
+            currentCampTab = tab;
+            document.getElementById('tab-camp-current').className = (tab === 'current') ? 'active' : '';
+            document.getElementById('tab-camp-past').className = (tab === 'past') ? 'active' : '';
+            renderCampaigns();
+        }
+
         function renderUI() {
             renderTemplates();
             renderMilitants();
@@ -391,16 +426,15 @@
             renderDetailedStats();
         }
 
-        // --- GESTION DES TEMPLATES & CATÉGORIES PERSONNALISÉES ---
+        // --- GESTION DES CATEGORIES PAR LIBELLE ---
         function addNewCategory() {
-            const key = document.getElementById('new-cat-key').value.trim().toLowerCase().replace(/\s+/g, '_');
             const label = document.getElementById('new-cat-label').value.trim();
-            if(!key || !label) { alert("Remplis le nom technique et le libellé !"); return; }
+            if(!label) { alert("Saisis un libellé !"); return; }
+            const key = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
             if(templates[key]) { alert("Cette catégorie existe déjà !"); return; }
 
             templates[key] = { label: label, list: [] };
             saveData();
-            document.getElementById('new-cat-key').value = '';
             document.getElementById('new-cat-label').value = '';
             renderTemplates();
         }
@@ -408,6 +442,8 @@
         function renderTemplates() {
             const container = document.getElementById('templates-list-grouped');
             const select = document.getElementById('template-cat');
+            if(!container || !select) return;
+
             container.innerHTML = '';
             select.innerHTML = '';
 
@@ -418,7 +454,7 @@
 
                 select.innerHTML += `<option value="${cat}">${catLabel}</option>`;
                 
-                container.innerHTML += `<div style="font-weight:bold; margin-top:12px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between;"><span>${catLabel}</span> ${Object.keys(templates).length > 1 ? `<button class="delete-btn" onclick="deleteCategory('${cat}')" style="font-size:0.75rem;">Supprimer catégorie</button>` : ''}</div>`;
+                container.innerHTML += `<div style="font-weight:bold; margin-top:12px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between;"><span>${catLabel}</span> ${Object.keys(templates).length > 1 ? `<button class="delete-btn" onclick="deleteCategory('${cat}')" style="font-size:0.75rem;">Supprimer</button>` : ''}</div>`;
                 
                 if(catList) {
                     catList.forEach((t, index) => {
@@ -436,17 +472,14 @@
         }
 
         function deleteCategory(cat) {
-            if(confirm("Supprimer toute cette catégorie de messages ?")) {
-                delete templates[cat];
-                saveData();
-                renderTemplates();
-            }
+            if(confirm("Supprimer cette catégorie ?")) { delete templates[cat]; saveData(); renderTemplates(); }
         }
 
         function addTemplate() {
             const cat = document.getElementById('template-cat').value;
             const input = document.getElementById('new-template');
             if(input.value.trim() !== '') {
+                if(!templates[cat]) templates[cat] = { label: cat, list: [] };
                 if(!templates[cat].list) templates[cat].list = [];
                 templates[cat].list.push(input.value.trim());
                 input.value = '';
@@ -458,34 +491,30 @@
         function editTemplate(cat, index) {
             let catData = templates[cat];
             let currentText = Array.isArray(catData) ? catData[index] : catData.list[index];
-            const newText = prompt("Modifier le message type :", currentText);
+            const newText = prompt("Modifier le message :", currentText);
             if (newText !== null && newText.trim() !== "") {
                 if(Array.isArray(templates[cat])) templates[cat][index] = newText.trim();
                 else templates[cat].list[index] = newText.trim();
-                saveData();
-                renderTemplates();
+                saveData(); renderTemplates();
             }
         }
 
         function deleteTemplate(cat, index) {
             if(Array.isArray(templates[cat])) templates[cat].splice(index, 1);
             else templates[cat].list.splice(index, 1);
-            saveData();
-            renderTemplates();
+            saveData(); renderTemplates();
         }
 
-        // --- AGENDA & LIMITATION À 5 ÉVÉNEMENTS + DÉFILEMENT ---
+        // --- AGENDA ---
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
+            if(!container) return;
             if(!calendarEvents || calendarEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color: var(--gray);">Aucun événement dans l\'agenda.</p>';
+                container.innerHTML = '<p style="font-size:0.85rem; color: var(--gray);">Aucun événement.</p>';
                 return;
             }
 
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const todayTimestamp = today.getTime();
-
+            const today = new Date(); today.setHours(0, 0, 0, 0);
             const startStr = document.getElementById('filter-start').value;
             const endStr = document.getElementById('filter-end').value;
             let startTime = startStr ? new Date(startStr).setHours(0,0,0,0) : null;
@@ -493,63 +522,49 @@
 
             let filteredEvents = calendarEvents.filter(ev => {
                 let evTime = ev.timestamp || 0;
-                if (currentTab === 'upcoming' && evTime < todayTimestamp) return false;
-                if (currentTab === 'past' && evTime >= todayTimestamp) return false;
+                if (currentTab === 'upcoming' && evTime < today.getTime()) return false;
+                if (currentTab === 'past' && evTime >= today.getTime()) return false;
                 if (startTime && evTime < startTime) return false;
                 if (endTime && evTime > endTime) return false;
                 return true;
             });
 
-            filteredEvents.sort((a, b) => {
-                let tA = a.timestamp || 0;
-                let tB = b.timestamp || 0;
-                return (currentTab === 'upcoming') ? (tA - tB) : (tB - tA);
-            });
+            filteredEvents.sort((a, b) => (currentTab === 'upcoming') ? (a.timestamp - b.timestamp) : (b.timestamp - a.timestamp));
 
             if(filteredEvents.length === 0) {
-                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucune action ${currentTab === 'upcoming' ? 'à venir' : 'dans l\'historique'} pour cette période.</p>`;
+                container.innerHTML = `<p style="font-size:0.85rem; color: var(--gray);">Aucune action pour ce filtre.</p>`;
                 return;
             }
 
             let html = '<div class="events-scroll-box">';
             filteredEvents.forEach((ev, idx) => {
-                const safeSummary = (ev.summary || 'Action militante').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const safeSummary = (ev.summary || 'Action').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const dateTimeStr = ev.time ? `${ev.date} à ${ev.time}` : ev.date;
-                const locationStr = ev.location || 'Lieu non spécifié';
+                const locationStr = ev.location || '';
                 const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const eventId = "ev_" + (ev.timestamp || idx);
 
                 html += `
                     <div style="background:#f7fafc; border:1px solid #e2e8f0; padding:12px; border-radius:8px; margin-bottom:10px;">
                         <div style="font-weight:bold; font-size:1rem; margin-bottom:4px;">${ev.summary}</div>
-                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">
-                            📅 ${dateTimeStr} <br>📍 ${locationStr}
-                        </div>
-                        <button onclick="initCampaign('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}')" style="padding:8px 12px; font-size:0.85rem;">📂 Gérer / Lancer la campagne SMS</button>
+                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:8px;">📅 ${dateTimeStr} <br>📍 ${locationStr || 'Lieu non spécifié'}</div>
+                        <button onclick="initCampaign('${eventId}', '${safeSummary}', '${dateTimeStr}', '${ev.date}', '${safeLocation}', ${ev.timestamp || 0})" style="padding:8px 12px; font-size:0.85rem;">📂 Lancer la campagne SMS</button>
                     </div>`;
             });
             html += '</div>';
             container.innerHTML = html;
         }
 
-        function initCampaign(eventId, actionName, actionDate, rawDateStr, actionLocation) {
-            if(militants.length === 0) { alert("Ajoute d'abord des militants dans ton carnet !"); return; }
-            
+        function initCampaign(eventId, actionName, actionDate, rawDateStr, actionLocation, timestamp) {
+            if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
             if(!campaigns[eventId]) {
                 campaigns[eventId] = {
                     name: actionName,
                     date: actionDate,
                     rawDate: rawDateStr,
                     location: actionLocation,
-                    queue: militants.map(m => ({
-                        name: m.name,
-                        lastname: m.lastname || "",
-                        phone: m.phone,
-                        message: "",
-                        status: 'À contacter',
-                        sentAt: null,
-                        lastSentTimestamp: null
-                    }))
+                    timestamp: timestamp || new Date().getTime(),
+                    queue: militants.map(m => ({ name: m.name, lastname: m.lastname || "", phone: m.phone, message: "", status: 'À contacter', sentAt: null, lastSentTimestamp: null }))
                 };
                 saveData();
             }
@@ -560,79 +575,60 @@
             const newName = document.getElementById(`camp_name_${eventId}`).value.trim();
             const newDate = document.getElementById(`camp_date_${eventId}`).value.trim();
             const newLocation = document.getElementById(`camp_loc_${eventId}`).value.trim();
-
             if(campaigns[eventId]) {
                 campaigns[eventId].name = newName || campaigns[eventId].name;
                 campaigns[eventId].date = newDate || campaigns[eventId].date;
                 campaigns[eventId].location = newLocation;
-                saveData();
-                alert("Modifications enregistrées !");
-                renderCampaigns();
+                saveData(); alert("Modifications enregistrées !"); renderCampaigns();
             }
         }
 
+        // --- CAMPAGNES & SOUS-TITRE + STATUT AUTO ---
         function renderCampaigns() {
             const container = document.getElementById('campaigns-container');
+            if(!container) return;
             container.innerHTML = '';
 
             if(!campaigns || Object.keys(campaigns).length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color: var(--gray);">Aucune campagne active. Lance une action depuis l\'Agenda !</p>';
+                container.innerHTML = '<p style="font-size:0.85rem; color: var(--gray);">Aucune campagne active.</p>';
                 return;
             }
 
+            const now = new Date().getTime();
+            let count = 0;
+
             for (let eventId in campaigns) {
                 let camp = campaigns[eventId];
-                let stats = { oui: 0, non: 0, attente: 0, contacter: 0, relancer: 0, rappel: 0 };
-                let now = new Date().getTime();
                 
-                let isTomorrow = false;
-                if(camp.rawDate) {
+                let isPast = false;
+                if(camp.timestamp && camp.timestamp < now) isPast = true;
+                else if(camp.rawDate) {
                     let parts = camp.rawDate.split('/');
                     if(parts.length === 3) {
                         let evDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                        let tomorrow = new Date();
-                        tomorrow.setDate(tomorrow.getDate() + 1);
-                        isTomorrow = (evDate.toDateString() === tomorrow.toDateString());
+                        if(evDate.getTime() < new Date().setHours(0,0,0,0)) isPast = true;
                     }
                 }
 
+                if(currentCampTab === 'current' && isPast) continue;
+                if(currentCampTab === 'past' && !isPast) continue;
+                count++;
+
+                let stats = { oui: 0, non: 0, attente: 0, contacter: 0 };
                 camp.queue.forEach(item => {
                     if(item.status === 'Participe') stats.oui++;
                     else if(item.status === 'Refus') stats.non++;
-                    else if(item.status === 'En attente de réponse') {
-                        stats.attente++;
-                        if(item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000)) stats.relancer++;
-                    }
+                    else if(item.status === 'En attente de réponse') stats.attente++;
                     else stats.contacter++;
-                    if(isTomorrow && item.status !== 'Refus') stats.rappel++;
                 });
 
                 let currentFilter = activeFilterStatus[eventId] || 'all';
                 let queueHtml = '';
-                let filteredQueue = camp.queue.filter(item => {
-                    if (currentFilter === 'all') return true;
-                    if (currentFilter === 'Participe') return item.status === 'Participe';
-                    if (currentFilter === 'Refus') return item.status === 'Refus';
-                    if (currentFilter === 'En attente de réponse') return item.status === 'En attente de réponse';
-                    if (currentFilter === 'À contacter') return item.status === 'À contacter';
-                    if (currentFilter === 'relancer') return item.status === 'En attente de réponse' && item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000);
-                    if (currentFilter === 'rappel') return isTomorrow && item.status !== 'Refus';
-                    return true;
-                });
-
-                filteredQueue.forEach((item) => {
+                camp.queue.filter(item => currentFilter === 'all' || item.status === currentFilter).forEach((item) => {
                     let realIndex = camp.queue.indexOf(item);
-                    let badgeClass = 'bg-gray';
-                    if(item.status === 'Participe') badgeClass = 'bg-success';
-                    if(item.status === 'Refus') badgeClass = 'bg-danger';
-                    if(item.status === 'En attente de réponse') badgeClass = 'bg-warning';
-                    if(item.status === 'À contacter') badgeClass = 'bg-info';
-
-                    let needsRelance = (item.status === 'En attente de réponse' && item.lastSentTimestamp && (now - item.lastSentTimestamp > 172800000));
-                    let metaText = item.sentAt ? `Envoyé le : ${item.sentAt}` : 'Jamais contacté';
+                    let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info'));
                     const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
 
-                    // Construction dynamique des options du select pour ce militant
                     let templateOptions = '';
                     for (let cat in templates) {
                         let cLabel = typeof templates[cat] === 'object' ? templates[cat].label : cat;
@@ -645,266 +641,158 @@
                                 <strong>${fullName} (${item.phone})</strong>
                                 <span class="tag ${badgeClass}">${item.status}</span>
                             </div>
-                            ${needsRelance ? '<div style="color:var(--danger); font-size:0.75rem; font-weight:bold; margin-top:4px;">⚠️ À relancer (> 2 jours)</div>' : ''}
-                            ${isTomorrow ? '<div style="color:var(--primary); font-size:0.75rem; font-weight:bold; margin-top:4px;">⏰ Rappel conseillé (Demain)</div>' : ''}
-                            
                             <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
-                            
                             <div style="display:flex; gap:5px; margin-bottom:8px;">
-                                <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">
-                                    ${templateOptions}
-                                </select>
-                                <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer msg</button>
+                                <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
+                                <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
                             </div>
-
-                            <div class="meta-info">🕒 ${metaText}</div>
-                            <div class="actions-flex">
-                                <a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})">
-                                    <button>📲 Envoyer le SMS</button>
-                                </a>
-                            </div>
+                            <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
+                            <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
                             <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#4a5568;">🔄 À contacter</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#d69e2e;">⏳ En attente</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#38a169;">✅ Oui</button>
-                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#e53e3e;">❌ Non</button>
+                                <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
+                                <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ Attente</button>
+                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
+                                <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
                             </div>
-                        </div>
-                    `;
+                        </div>`;
                 });
 
                 container.innerHTML += `
                     <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
-                        <h3 style="margin-top:0; color:var(--primary-dark); display:flex; justify-content:space-between; align-items:center;">
-                            <span>${camp.name}</span>
-                            <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.8rem;">Supprimer campagne</button>
-                        </h3>
-
-                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px;">
-                            <label style="font-size:0.75rem; color:var(--gray);">Modifier le titre :</label>
-                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" style="margin-bottom:8px; font-size:0.9rem; background:#fff;">
-                            
-                            <div style="display:flex; gap:10px; margin-bottom: 8px;">
-                                <div style="flex:1;">
-                                    <label style="font-size:0.75rem; color:var(--gray);">Date / Heure :</label>
-                                    <input type="text" id="camp_date_${eventId}" value="${camp.date}" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
-                                </div>
-                                <div style="flex:1;">
-                                    <label style="font-size:0.75rem; color:var(--gray);">Lieu :</label>
-                                    <input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
-                                </div>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <h3 style="margin:0; color:var(--primary-dark); font-size:1.1rem;">${camp.name}</h3>
+                                <div style="font-size:0.85rem; color:var(--gray); margin-top:2px; font-weight: 600;">📅 ${camp.date}</div>
+                                <div style="font-size:0.8rem; color:var(--gray);">📍 ${camp.location || 'Lieu non spécifié'}</div>
                             </div>
-                            <button onclick="saveCampaignDetails('${eventId}')" class="btn-secondary" style="padding: 6px; font-size: 0.8rem; background: var(--info);">💾 Enregistrer</button>
+                            <span class="tag ${isPast ? 'bg-gray' : 'bg-success'}" style="font-size:0.75rem; padding:5px 10px;">${isPast ? 'Passée' : 'En cours'}</span>
+                        </div>
+                        <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.75rem; margin-top:8px;">Supprimer campagne</button>
+
+                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin: 10px 0;">
+                            <label style="font-size:0.75rem; color:var(--gray);">Modifier le titre :</label>
+                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" style="margin-bottom:6px; font-size:0.85rem; background:#fff;">
+                            <div style="display:flex; gap:10px; margin-bottom:6px;">
+                                <div style="flex:1;"><label style="font-size:0.7rem; color:var(--gray);">Date :</label><input type="text" id="camp_date_${eventId}" value="${camp.date}" style="margin-bottom:0; font-size:0.8rem; background:#fff;"></div>
+                                <div style="flex:1;"><label style="font-size:0.7rem; color:var(--gray);">Lieu :</label><input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" style="margin-bottom:0; font-size:0.8rem; background:#fff;"></div>
+                            </div>
+                            <button onclick="saveCampaignDetails('${eventId}')" class="btn-secondary" style="padding: 4px; font-size: 0.75rem; background: var(--info);">💾 Enregistrer</button>
                         </div>
                         
-                        <div style="margin-bottom:12px;">
+                        <div style="margin-bottom:10px;">
                             <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${stats.oui}</span>
                             <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${stats.non}</span>
                             <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
-                            <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">🔄 À contacter : ${stats.contacter}</span>
                         </div>
 
-                        <div style="margin-bottom: 12px;">
-                            <label style="font-size:0.80rem;">Filtrer l'affichage :</label>
-                            <select onchange="filterCampaignStatus('${eventId}', this.value)" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
-                                <option value="all" ${currentFilter==='all'?'selected':''}>Tous (${camp.queue.length})</option>
-                                <option value="À contacter" ${currentFilter==='À contacter'?'selected':''}>À contacter (${stats.contacter})</option>
-                                <option value="En attente de réponse" ${currentFilter==='En attente de réponse'?'selected':''}>En attente (${stats.attente})</option>
-                                <option value="Participe" ${currentFilter==='Participe'?'selected':''}>Oui (${stats.oui})</option>
-                                <option value="Refus" ${currentFilter==='Refus'?'selected':''}>Non (${stats.non})</option>
-                            </select>
-                        </div>
-
-                        <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant pour ce filtre.</p>'}</div>
-                    </div>
-                `;
-            }
-        }
-
-        // --- PAGE STATISTIQUES & RÉTROSPECTIVE COMPLÈTE ---
-        function renderDetailedStats() {
-            const selectAction = document.getElementById('stat-filter-action');
-            const globalContainer = document.getElementById('global-stats-container');
-            const detailedContainer = document.getElementById('detailed-stats-container');
-            
-            if(!selectAction || !globalContainer) return;
-
-            let currentSelected = selectAction.value;
-            selectAction.innerHTML = '<option value="all">Toutes les actions</option>';
-            
-            for(let id in campaigns) {
-                let camp = campaigns[id];
-                selectAction.innerHTML += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${camp.name} (${camp.date})</option>`;
-            }
-
-            let totalCamp = 0, totalContacted = 0, totalYes = 0, totalNo = 0, totalPending = 0, totalNever = 0;
-            let actionDetailsHtml = '';
-
-            for (let id in campaigns) {
-                if(currentSelected !== 'all' && currentSelected !== id) continue;
-                let camp = campaigns[id];
-                totalCamp++;
-
-                let cYes = 0, cNo = 0, cPending = 0, cNever = 0, cContacted = 0;
-                let militantRows = '';
-
-                if(camp.queue) {
-                    camp.queue.forEach(item => {
-                        const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
-                        if(item.sentAt) cContacted++;
-                        if(item.status === 'Participe') { cYes++; totalYes++; }
-                        else if(item.status === 'Refus') { cNo++; totalNo++; }
-                        else if(item.status === 'En attente de réponse') { cPending++; totalPending++; }
-                        else { cNever++; totalNever++; }
-
-                        militantRows += `
-                            <tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
-                                <td style="padding: 6px;">${fullName}</td>
-                                <td style="padding: 6px;">${item.phone}</td>
-                                <td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':(item.status==='En attente de réponse'?'bg-warning':'bg-info'))}">${item.status}</span></td>
-                                <td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
-                            </tr>`;
-                    });
-                    totalContacted += cContacted;
-                }
-
-                actionDetailsHtml += `
-                    <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
-                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1.05rem;">📍 ${camp.name} <span style="font-weight:normal; font-size:0.85rem; color:var(--gray);">(${camp.date} | ${camp.location || 'Lieu non spécifié'})</span></h3>
-                        <div style="margin-bottom:10px;">
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span>
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
-                            <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cPending}</span>
-                            <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">🔄 À contacter : ${cNever}</span>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table style="width:100%; border-collapse: collapse; text-align: left;">
-                                <thead>
-                                    <tr style="background:#f7fafc; font-size:0.8rem; color:var(--gray);">
-                                        <th style="padding:6px;">Militant</th>
-                                        <th style="padding:6px;">Téléphone</th>
-                                        <th style="padding:6px;">Statut</th>
-                                        <th style="padding:6px;">Dernier contact</th>
-                                    </tr>
-                                </thead>
-                                <tbody>${militantRows}</tbody>
-                            </table>
-                        </div>
+                        <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant.</p>'}</div>
                     </div>`;
             }
-
-            globalContainer.innerHTML = `
-                <div style="display:flex; flex-wrap:wrap; gap:8px;">
-                    <span class="stats-badge" style="background:#fff; border:1px solid #cbd5e0;">📂 Actions analysées : ${totalCamp}</span>
-                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Total Oui : ${totalYes}</span>
-                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Total Non : ${totalNo}</span>
-                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Total Attente : ${totalPending}</span>
-                    <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS envoyés : ${totalContacted}</span>
-                </div>`;
-
-            detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée statistique pour cette sélection.</p>';
-        }
-
-        function filterCampaignStatus(eventId, status) {
-            activeFilterStatus[eventId] = status;
-            renderCampaigns();
+            if(count === 0) container.innerHTML = `<p style="font-size:0.85rem; color: var(--gray);">Aucune campagne ${currentCampTab === 'current' ? 'en cours' : 'passée'}.</p>`;
         }
 
         function generateMessage(eventId, index) {
             const select = document.getElementById(`cat_select_${eventId}_${index}`);
-            const cat = select.value;
-            let catData = templates[cat];
-            let list = Array.isArray(catData) ? catData : (catData ? catData.list : []);
-            
-            if(!list || list.length === 0) {
-                alert("Aucun message type dans cette catégorie !");
-                return;
-            }
+            const list = templates[select.value]?.list || [];
+            if(!list.length) { alert("Aucun message dans cette catégorie !"); return; }
             const randomTpl = list[Math.floor(Math.random() * list.length)];
             const camp = campaigns[eventId];
             const item = camp.queue[index];
 
-            let msg = randomTpl
+            campaigns[eventId].queue[index].message = randomTpl
                 .replace(/{prenom}/g, item.name)
                 .replace(/{action}/g, camp.name)
                 .replace(/{date}/g, camp.date)
                 .replace(/{lieu}/g, camp.location || "sur place");
-
-            campaigns[eventId].queue[index].message = msg;
-            saveData();
-            renderCampaigns();
+            saveData(); renderCampaigns();
         }
 
         function markAsSent(eventId, index) {
             const now = new Date();
             campaigns[eventId].queue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
             campaigns[eventId].queue[index].lastSentTimestamp = now.getTime();
-            if(campaigns[eventId].queue[index].status === 'À contacter') {
-                campaigns[eventId].queue[index].status = 'En attente de réponse';
-            }
+            if(campaigns[eventId].queue[index].status === 'À contacter') campaigns[eventId].queue[index].status = 'En attente de réponse';
             saveData();
         }
 
-        function setStatus(eventId, index, status) {
-            campaigns[eventId].queue[index].status = status;
-            saveData();
-            renderCampaigns();
-        }
+        function setStatus(eventId, index, status) { campaigns[eventId].queue[index].status = status; saveData(); renderCampaigns(); }
+        function deleteCampaign(eventId) { if(confirm("Supprimer cette campagne ?")) { delete campaigns[eventId]; saveData(); renderCampaigns(); } }
 
-        function deleteCampaign(eventId) {
-            if(confirm("Supprimer le suivi de cette campagne ?")) {
-                delete campaigns[eventId];
-                saveData();
-                renderCampaigns();
+        // --- STATISTIQUES ---
+        function renderDetailedStats() {
+            const selectAction = document.getElementById('stat-filter-action');
+            const globalContainer = document.getElementById('global-stats-container');
+            const detailedContainer = document.getElementById('detailed-stats-container');
+            if(!selectAction) return;
+
+            let currentSelected = selectAction.value;
+            selectAction.innerHTML = '<option value="all">Toutes les actions</option>';
+            for(let id in campaigns) {
+                selectAction.innerHTML += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].name} (${campaigns[id].date})</option>`;
             }
+
+            let totalYes = 0, totalNo = 0, totalPending = 0, totalContacted = 0, actionDetailsHtml = '';
+            for (let id in campaigns) {
+                if(currentSelected !== 'all' && currentSelected !== id) continue;
+                let camp = campaigns[id];
+                let cYes = 0, cNo = 0, cPending = 0, militantRows = '';
+
+                if(camp.queue) {
+                    camp.queue.forEach(item => {
+                        if(item.sentAt) totalContacted++;
+                        if(item.status === 'Participe') { cYes++; totalYes++; }
+                        else if(item.status === 'Refus') { cNo++; totalNo++; }
+                        else { cPending++; totalPending++; }
+
+                        militantRows += `
+                            <tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
+                                <td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td>
+                                <td style="padding: 6px;">${item.phone}</td>
+                                <td style="padding: 6px;"><span class="tag ${item.status==='Participe'?'bg-success':(item.status==='Refus'?'bg-danger':'bg-warning')}">${item.status}</span></td>
+                                <td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
+                            </tr>`;
+                    });
+                }
+                actionDetailsHtml += `
+                    <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
+                        <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 ${camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
+                        <div style="margin-bottom:8px;"><span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span></div>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;">
+                            <thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead>
+                            <tbody>${militantRows}</tbody>
+                        </table>
+                    </div>`;
+            }
+
+            globalContainer.innerHTML = `<span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> <span class="stats-badge" style="background:#e2e8f0; color:#4a5568;">📲 SMS : ${totalContacted}</span>`;
+            detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
         }
 
+        // --- MILITANTS ---
         function addMilitant() {
             const name = document.getElementById('m-name').value.trim();
             const lastname = document.getElementById('m-lastname').value.trim();
             const phone = document.getElementById('m-phone').value.trim();
-            if(name && phone) {
-                militants.push({ name, lastname, phone });
-                document.getElementById('m-name').value = '';
-                document.getElementById('m-lastname').value = '';
-                document.getElementById('m-phone').value = '';
-                saveData();
-                renderMilitants();
-            } else { alert("Remplis au moins le prénom et le numéro !"); }
+            if(name && phone) { militants.push({ name, lastname, phone }); document.getElementById('m-name').value=''; document.getElementById('m-lastname').value=''; document.getElementById('m-phone').value=''; saveData(); renderMilitants(); }
+            else alert("Prénom et numéro obligatoires !");
         }
-
         function renderMilitants() {
-            const mContainer = document.getElementById('militants-ul');
+            const mContainer = document.getElementById('militants-ul'); if(!mContainer) return;
             mContainer.innerHTML = '';
             militants.forEach((m, index) => {
-                const displayName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
-                mContainer.innerHTML += `
-                    <li class="list-group-item">
-                        <span><strong>${displayName}</strong> (${m.phone})</span>
-                        <button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button>
-                    </li>`;
+                mContainer.innerHTML += `<li class="list-group-item"><span><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong> (${m.phone})</span><button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button></li>`;
             });
         }
-
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); renderMilitants(); }
-
-        function importCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        function importCSV(e) {
+            const file = e.target.files[0]; if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const lines = e.target.result.split('\n');
-                lines.forEach(line => {
+            reader.onload = function(evt) {
+                evt.target.result.split('\n').forEach(line => {
                     const cols = line.split(',');
-                    if(cols.length >= 3) {
-                        militants.push({ name: cols[0].trim(), lastname: cols[1].trim(), phone: cols[2].trim() });
-                    } else if(cols.length === 2) {
-                        militants.push({ name: cols[0].trim(), lastname: "", phone: cols[1].trim() });
-                    }
+                    if(cols.length >= 2) militants.push({ name: cols[0].trim(), lastname: cols[1]?.trim() || "", phone: cols[cols.length-1].trim() });
                 });
-                saveData();
-                renderMilitants();
-                alert("Import CSV réussi !");
+                saveData(); renderMilitants(); alert("Import réussi !");
             };
             reader.readAsText(file);
         }
