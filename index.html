@@ -246,10 +246,10 @@
         }
         .modal.open { display: flex; }
         .modal-content {
-            background: white; width: 90%; max-width: 500px; max-height: 85vh; border-radius: 12px;
+            background: white; width: 92%; max-width: 520px; max-height: 85vh; border-radius: 12px;
             padding: 20px; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         }
-        .modal-body { overflow-y: auto; flex: 1; margin: 15px 0; padding-right: 5px; }
+        .modal-body { overflow-y: auto; flex: 1; margin: 10px 0; padding-right: 5px; }
     </style>
 </head>
 <body>
@@ -273,25 +273,40 @@
         <button id="nav-btn-stats" class="drawer-nav-item" onclick="switchView('stats')">📊 Statistiques</button>
     </nav>
 
-    <!-- MODALE DE SELECTION DE MILITANTS -->
+    <!-- MODALE DE SELECTION DE MILITANTS (EN 2 ÉTAPES) -->
     <div id="militant-modal" class="modal">
         <div class="modal-content">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 8px; margin-bottom: 10px;">
                 <h3 id="modal-title" style="margin:0; color:var(--primary-dark); font-size: 1.1rem;">Sélectionner les militants</h3>
                 <button onclick="closeMilitantModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--gray); width:auto; padding:0;">✕</button>
             </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                <input type="text" id="modal-search" placeholder="Rechercher par nom, entreprise, ville..." oninput="renderModalMilitants()" style="margin-bottom:0; font-size:0.85rem;">
+
+            <!-- ÉTAPE 1 : SELECTION DES TAGS -->
+            <div id="modal-step-tags" style="display:block;">
+                <label style="font-size:0.85rem; color:var(--primary-dark); margin-bottom:8px;">Étape 1 : Cochez un ou plusieurs tags / entreprises (ou laissez tout décoché pour voir tout le monde) :</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <button onclick="toggleSelectAllTags(true)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout cocher</button>
+                    <button onclick="toggleSelectAllTags(false)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout décocher</button>
+                </div>
+                <div id="modal-tags-checkboxes-container" class="modal-body" style="max-height: 250px; border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:#f8fafc; margin-bottom: 15px;"></div>
+                <button onclick="goToModalMilitantsStep()" style="background:var(--info);">Suivant : Choisir les militants ➔</button>
             </div>
-            <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                <button onclick="toggleSelectAllModal(true)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout cocher</button>
-                <button onclick="toggleSelectAllModal(false)" class="btn-secondary" style="padding:6px; font-size:0.75rem;">Tout décocher</button>
-            </div>
-            <div id="modal-company-filters" style="display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 10px;"></div>
-            <div class="modal-body" id="modal-militants-list"></div>
-            <div style="display: flex; gap: 10px;">
-                <button onclick="closeMilitantModal()" class="btn-secondary" style="background:var(--gray);">Annuler</button>
-                <button onclick="confirmCampaignSelection()">Valider et enregistrer</button>
+
+            <!-- ÉTAPE 2 : SELECTION DES MILITANTS -->
+            <div id="modal-step-militants" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:5px 10px; font-size:0.75rem; background:var(--gray);">⬅️ Retour aux tags</button>
+                    <div style="display: flex; gap: 5px;">
+                        <button onclick="toggleSelectAllMilitants(true)" class="btn-secondary" style="padding:5px 8px; font-size:0.75rem;">Tout cocher</button>
+                        <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:5px 8px; font-size:0.75rem;">Tout décocher</button>
+                    </div>
+                </div>
+                <input type="text" id="modal-search" placeholder="Rechercher par nom, ville..." oninput="renderModalMilitantsList()" style="margin-bottom:8px; font-size:0.85rem;">
+                <div class="modal-body" id="modal-militants-list" style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; background:#fff; margin-bottom: 10px;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="closeMilitantModal()" class="btn-secondary" style="background:var(--gray);">Annuler</button>
+                    <button onclick="confirmCampaignSelection()">Valider et enregistrer</button>
+                </div>
             </div>
         </div>
     </div>
@@ -388,11 +403,14 @@
                     <button id="tab-stat-militant" onclick="switchStatTab('militant')">👤 Par Militant</button>
                 </div>
 
-                <div id="stat-filter-container" style="margin-bottom:15px;">
-                    <label style="font-size:0.8rem;" id="stat-filter-label">Filtrer :</label>
-                    <select id="stat-filter-select" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">
-                        <option value="all">Tous</option>
-                    </select>
+                <div id="stat-filter-container" style="margin-bottom:15px; display:flex; gap:10px; align-items:flex-end;">
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem;" id="stat-filter-label">Filtrer :</label>
+                        <div id="stat-filter-input-wrapper"></div>
+                    </div>
+                    <div>
+                        <button onclick="exportCurrentStatsCSV()" class="btn-secondary" style="background:var(--success); font-size:0.85rem; padding:10px 15px; white-space:nowrap;">📥 Exporter CSV</button>
+                    </div>
                 </div>
 
                 <div id="global-stats-container" style="font-size: 0.9rem; color: #2d3748; margin-bottom: 20px;"></div>
@@ -433,6 +451,7 @@
         let currentStatTab = 'date';
 
         let modalTargetEventId = null;
+        let modalCachedEventData = null;
 
         db.ref('templates').on('value', (snap) => { 
             if(snap.val()) { 
@@ -660,24 +679,21 @@
             switchView('campaigns');
         }
 
-        let modalCachedEventData = null;
-
+        // --- GESTION DE LA MODALE EN 2 ETAPES ---
         function openMilitantModalForEvent(eventId, actionName, actionDate, rawDateStr, actionLocation, timestamp) {
             if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
             modalTargetEventId = eventId;
             modalCachedEventData = { name: actionName, date: actionDate, rawDate: rawDateStr, location: actionLocation, timestamp: timestamp };
             
             document.getElementById('modal-title').innerText = `Sélection - ${actionName}`;
-            document.getElementById('modal-search').value = '';
-            renderModalMilitants();
+            renderModalTagsStep();
             document.getElementById('militant-modal').classList.add('open');
         }
 
         function openAddMilitantsToCampaign(eventId) {
             modalTargetEventId = eventId;
             document.getElementById('modal-title').innerText = `Ajouter des militants à la campagne`;
-            document.getElementById('modal-search').value = '';
-            renderModalMilitants();
+            renderModalTagsStep();
             document.getElementById('militant-modal').classList.add('open');
         }
 
@@ -686,20 +702,54 @@
             modalTargetEventId = null;
         }
 
-        function renderModalMilitants() {
+        function renderModalTagsStep() {
+            document.getElementById('modal-step-tags').style.display = 'block';
+            document.getElementById('modal-step-militants').style.display = 'none';
+
+            let container = document.getElementById('modal-tags-checkboxes-container');
+            let companies = [...new Set(militants.map(m => m.company).filter(Boolean))].sort();
+
+            let html = '';
+            companies.forEach((comp, idx) => {
+                html += `
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-weight:normal; font-size:0.85rem; cursor:pointer;">
+                        <input type="checkbox" class="modal-tag-checkbox" value="${comp}">
+                        <span class="tag bg-info">${comp}</span>
+                    </label>`;
+            });
+            if(companies.length === 0) {
+                html = '<p style="font-size:0.8rem; color:var(--gray); text-align:center;">Aucun tag / entreprise trouvé dans les militants.</p>';
+            }
+            container.innerHTML = html;
+        }
+
+        function toggleSelectAllTags(select) {
+            let checkboxes = document.querySelectorAll('.modal-tag-checkbox');
+            checkboxes.forEach(cb => cb.checked = select);
+        }
+
+        function goToModalMilitantsStep() {
+            document.getElementById('modal-step-tags').style.display = 'none';
+            document.getElementById('modal-step-militants').style.display = 'flex';
+            document.getElementById('modal-search').value = '';
+            renderModalMilitantsList();
+        }
+
+        function backToModalTagsStep() {
+            document.getElementById('modal-step-militants').style.display = 'none';
+            document.getElementById('modal-step-tags').style.display = 'block';
+        }
+
+        function renderModalMilitantsList() {
             const container = document.getElementById('modal-militants-list');
             const searchInput = document.getElementById('modal-search');
-            const filtersContainer = document.getElementById('modal-company-filters');
             if(!container) return;
 
             let filter = searchInput ? searchInput.value.toLowerCase() : '';
 
-            let companies = [...new Set(militants.map(m => m.company).filter(Boolean))];
-            let filtersHtml = `<button onclick="filterByCompanyModal('')" class="tag bg-gray" style="border:none; cursor:pointer;">Tous</button>`;
-            companies.forEach(c => {
-                filtersHtml += `<button onclick="filterByCompanyModal('${c}')" class="tag bg-info" style="border:none; cursor:pointer;">${c}</button>`;
-            });
-            filtersContainer.innerHTML = filtersHtml;
+            // Récupérer les tags sélectionnés à l'étape 1
+            let selectedTags = [];
+            document.querySelectorAll('.modal-tag-checkbox:checked').forEach(cb => selectedTags.push(cb.value));
 
             let existingPhones = [];
             if(campaigns[modalTargetEventId] && campaigns[modalTargetEventId].queue) {
@@ -708,6 +758,9 @@
 
             let html = '';
             militants.forEach((m, idx) => {
+                // Si des tags ont été sélectionnés, on ne garde que les militants ayant l'un de ces tags
+                if(selectedTags.length > 0 && (!m.company || !selectedTags.includes(m.company))) return;
+
                 let fullName = `${m.name} ${m.lastname || ''} ${m.company || ''} ${m.city || ''} ${m.phone}`.toLowerCase();
                 if(filter && !fullName.includes(filter)) return;
 
@@ -723,15 +776,10 @@
                         </label>
                     </div>`;
             });
-            container.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray); text-align:center;">Aucun militant trouvé.</p>';
+            container.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray); text-align:center;">Aucun militant ne correspond aux critères.</p>';
         }
 
-        function filterByCompanyModal(companyName) {
-            document.getElementById('modal-search').value = companyName;
-            renderModalMilitants();
-        }
-
-        function toggleSelectAllModal(select) {
+        function toggleSelectAllMilitants(select) {
             let checkboxes = document.querySelectorAll('.modal-militant-checkbox:not(:disabled)');
             checkboxes.forEach(cb => cb.checked = select);
         }
@@ -943,26 +991,29 @@
         function deleteCampaign(eventId) { if(confirm("Supprimer cette campagne ?")) { delete campaigns[eventId]; saveData(); renderCampaigns(); } }
 
         function renderDetailedStats() {
-            const selectFilter = document.getElementById('stat-filter-select');
+            const inputWrapper = document.getElementById('stat-filter-input-wrapper');
             const filterLabel = document.getElementById('stat-filter-label');
             const globalContainer = document.getElementById('global-stats-container');
             const detailedContainer = document.getElementById('detailed-stats-container');
-            if(!selectFilter) return;
+            if(!inputWrapper) return;
 
-            let currentSelected = selectFilter.value;
-            selectFilter.innerHTML = '<option value="all">Tous</option>';
+            let currentSelected = document.getElementById('stat-filter-val')?.value || 'all';
 
-            // ---- VUE 1 : PAR DATE ----
+            // ---- VUE 1 : PAR DATE (avec Calendrier) ----
             if (currentStatTab === 'date') {
-                filterLabel.innerText = "Filtrer par date :";
-                let dates = [...new Set(Object.values(campaigns).map(c => c.date))].sort();
-                dates.forEach(d => {
-                    selectFilter.innerHTML += `<option value="${d}" ${currentSelected === d ? 'selected' : ''}>${d}</option>`;
-                });
+                filterLabel.innerText = "Filtrer par date (Calendrier) :";
+                inputWrapper.innerHTML = `<input type="date" id="stat-filter-val" value="${currentSelected === 'all' ? '' : currentSelected}" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">`;
+                let selectedDateStr = document.getElementById('stat-filter-val').value;
+
+                let targetDateFormatted = "";
+                if(selectedDateStr) {
+                    let parts = selectedDateStr.split('-');
+                    if(parts.length === 3) targetDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                }
 
                 let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
                 Object.values(campaigns).forEach(camp => {
-                    if (currentSelected !== 'all' && camp.date !== currentSelected) return;
+                    if (targetDateFormatted && !camp.date.includes(targetDateFormatted)) return;
                     let cYes = 0, cNo = 0, rows = '';
                     if (camp.queue) {
                         camp.queue.forEach(item => {
@@ -985,9 +1036,12 @@
             // ---- VUE 2 : PAR ACTION ----
             else if (currentStatTab === 'action') {
                 filterLabel.innerText = "Filtrer par action :";
+                let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Toutes les actions</option>`;
                 for(let id in campaigns) {
-                    selectFilter.innerHTML += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].name} (${campaigns[id].date})</option>`;
+                    selectHtml += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].name} (${campaigns[id].date})</option>`;
                 }
+                selectHtml += `</select>`;
+                inputWrapper.innerHTML = selectHtml;
 
                 let totalYes = 0, totalNo = 0, totalContacted = 0, html = '';
                 for (let id in campaigns) {
@@ -1015,10 +1069,13 @@
             // ---- VUE 3 : PAR MILITANT ----
             else if (currentStatTab === 'militant') {
                 filterLabel.innerText = "Filtrer par militant :";
-                militants.forEach((m, idx) => {
+                let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Tous les militants</option>`;
+                militants.forEach((m) => {
                     let mName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
-                    selectFilter.innerHTML += `<option value="${m.phone}" ${currentSelected === m.phone ? 'selected' : ''}>${mName} (${m.phone})</option>`;
+                    selectHtml += `<option value="${m.phone}" ${currentSelected === m.phone ? 'selected' : ''}>${mName} (${m.phone})</option>`;
                 });
+                selectHtml += `</select>`;
+                inputWrapper.innerHTML = selectHtml;
 
                 let html = '';
                 militants.forEach(m => {
@@ -1061,6 +1118,82 @@
                 globalContainer.innerHTML = `<span class="stats-badge" style="background:#edf2f7; color:#2d3748;">👥 Total Militants dans le carnet : ${militants.length}</span>`;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant sélectionné.</p>';
             }
+        }
+
+        // --- EXPORT CSV DES STATISTIQUES ---
+        function exportCurrentStatsCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            if (currentStatTab === 'date' || currentStatTab === 'action') {
+                csvContent += "Action,DateAction,Lieu,NomMilitant,Telephone,StatutMilitant,DateContactSMS\r\n";
+                Object.values(campaigns).forEach(camp => {
+                    if (camp.queue) {
+                        camp.queue.forEach(item => {
+                            let fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+                            let row = [
+                                `"${camp.name.replace(/"/g, '""')}"`,
+                                `"${camp.date}"`,
+                                `"${(camp.location || '').replace(/"/g, '""')}"`,
+                                `"${fullName.replace(/"/g, '""')}"`,
+                                `"${item.phone}"`,
+                                `"${item.status}"`,
+                                `"${item.sentAt || 'Jamais'}"`
+                            ];
+                            csvContent += row.join(",") + "\r\n";
+                        });
+                    }
+                });
+            } else if (currentStatTab === 'militant') {
+                csvContent += "NomMilitant,Entreprise,Ville,Telephone,Action,DateAction,StatutMilitant,DateContactSMS\r\n";
+                militants.forEach(m => {
+                    let mPhoneClean = cleanPhone(m.phone);
+                    let mName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
+                    let foundAny = false;
+
+                    Object.values(campaigns).forEach(camp => {
+                        if (camp.queue) {
+                            camp.queue.forEach(item => {
+                                if (cleanPhone(item.phone) === mPhoneClean) {
+                                    foundAny = true;
+                                    let row = [
+                                        `"${mName.replace(/"/g, '""')}"`,
+                                        `"${(m.company || '').replace(/"/g, '""')}"`,
+                                        `"${(m.city || '').replace(/"/g, '""')}"`,
+                                        `"${m.phone}"`,
+                                        `"${camp.name.replace(/"/g, '""')}"`,
+                                        `"${camp.date}"`,
+                                        `"${item.status}"`,
+                                        `"${item.sentAt || 'Jamais'}"`
+                                    ];
+                                    csvContent += row.join(",") + "\r\n";
+                                }
+                            });
+                        }
+                    });
+
+                    if (!foundAny) {
+                        let row = [
+                            `"${mName.replace(/"/g, '""')}"`,
+                            `"${(m.company || '').replace(/"/g, '""')}"`,
+                            `"${(m.city || '').replace(/"/g, '""')}"`,
+                            `"${m.phone}"`,
+                            `"Aucune"`,
+                            `"Aucune"`,
+                            `"N/A"`,
+                            `"N/A"`
+                        ];
+                        csvContent += row.join(",") + "\r\n";
+                    }
+                });
+            }
+
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `statistiques_${currentStatTab}_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         // --- MILITANTS & NORMALISATION ROBUSTE CSV ---
