@@ -960,12 +960,10 @@
             detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
         }
 
-        // --- MILITANTS, NORMALISATION DES NUMÉROS & TRI ---
+        // --- MILITANTS, NORMALISATION ROBUSTE & PARCOURS CSV GOOGLE ---
         function cleanPhone(phone) {
             if(!phone) return "";
-            // Enlever tout sauf chiffres et +
             let cleaned = phone.replace(/[^0-9+]/g, '');
-            // Convertir le format international +33 en national 0
             if(cleaned.startsWith('+33')) {
                 cleaned = '0' + cleaned.slice(3);
             } else if(cleaned.startsWith('33') && cleaned.length === 11) {
@@ -985,7 +983,7 @@
 
             let exists = militants.some(m => cleanPhone(m.phone) === phone);
             if(exists) {
-                alert("⚠️ Ce numéro de téléphone existe déjà dans le carnet !");
+                alert("⚠️️ Ce numéro de téléphone existe déjà dans le carnet !");
                 return;
             }
 
@@ -1034,63 +1032,89 @@
 
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); renderMilitants(); }
 
+        // Analyseur CSV Google Contacts sur-mesure et robuste
+        function parseCSVLine(text) {
+            let result = [];
+            let cell = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                if (c === '"') {
+                    if (inQuotes && text[i + 1] === '"') { cell += '"'; i++; }
+                    else { inQuotes = !inQuotes; }
+                } else if (c === ',' && !inQuotes) {
+                    result.push(cell.trim());
+                    cell = '';
+                } else {
+                    cell += c;
+                }
+            }
+            result.push(cell.trim());
+            return result;
+        }
+
         function importCSV(e) {
             const file = e.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(evt) {
-                let text = evt.target.result;
-                let lines = text.split('\n');
+                let lines = evt.target.result.split('\n');
                 let addedCount = 0;
                 let dupCount = 0;
                 let noPhoneCount = 0;
 
-                lines.forEach((line, idx) => {
-                    if(idx === 0 || !line.trim()) return;
-                    
-                    let cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
-                    
-                    if(cols.length >= 1) {
-                        let name = "", lastname = "", company = "", city = "", phone = "";
+                // Récupération des en-têtes (ligne 0)
+                if(lines.length < 2) { alert("Fichier CSV vide ou invalide."); return; }
+                let headers = parseCSVLine(lines[0]);
 
-                        if(cols.length > 30) {
-                            name = cols[1] || "";
-                            lastname = cols[3] || "";
-                            company = cols[31] || "";
-                        } else {
-                            name = cols[0] || "";
-                            lastname = cols[1] || "";
-                            company = cols[2] || "";
-                            city = cols[3] || "";
-                        }
+                let fnIdx = headers.indexOf('First Name');
+                let lnIdx = headers.indexOf('Last Name');
+                let orgIdx = headers.indexOf('Organization Name');
+                let cityIdx = headers.indexOf('Address 1 - City');
 
-                        // Recherche intelligente d'un numéro dans TOUTES les colonnes si non trouvé
-                        for(let i = 0; i < cols.length; i++) {
-                            let val = cols[i];
-                            if(val && (/^[0-9+() \-\.]+$/.test(val)) && val.replace(/[^0-9]/g, '').length >= 9) {
-                                let cleanedCandidate = cleanPhone(val);
-                                if(cleanedCandidate.length >= 9 && !cleanedCandidate.includes('http')) {
-                                    phone = cleanedCandidate;
+                for (let i = 1; i < lines.length; i++) {
+                    let line = lines[i].trim();
+                    if(!line) continue;
+
+                    let cols = parseCSVLine(line);
+                    let name = fnIdx !== -1 ? cols[fnIdx] : (cols[0] || "");
+                    let lastname = lnIdx !== -1 ? cols[lnIdx] : (cols[1] || "");
+                    let company = orgIdx !== -1 ? cols[orgIdx] : (cols[2] || "");
+                    let city = cityIdx !== -1 ? cols[cityIdx] : (cols[3] || "");
+
+                    if(!name || name.toLowerCase().includes('name')) continue;
+
+                    // Recherche d'un numéro de téléphone valide dans TOUTES les colonnes de la ligne
+                    let phone = "";
+                    for (let j = 0; j < cols.length; j++) {
+                        let val = cols[j];
+                        if (val && /^[0-9+() \-\.]+$/.test(val) && val.replace(/[^0-9]/g, '').length >= 9) {
+                            // Gérer si Google exporte plusieurs numéros séparés par ":::"
+                            let parts = val.split(':::');
+                            for (let p of parts) {
+                                let cleaned = cleanPhone(p);
+                                if (cleaned.length >= 9 && !cleaned.includes('http')) {
+                                    phone = cleaned;
                                     break;
                                 }
                             }
-                        }
-
-                        if(!phone || phone.length < 9) {
-                            if(name) noPhoneCount++;
-                            return;
-                        }
-
-                        if(name && !name.toLowerCase().includes('name')) {
-                            let exists = militants.some(m => cleanPhone(m.phone) === phone);
-                            if(!exists) {
-                                militants.push({ name, lastname, company, city, phone });
-                                addedCount++;
-                            } else {
-                                dupCount++;
-                            }
+                            if (phone) break;
                         }
                     }
-                });
+
+                    if (!phone || phone.length < 9) {
+                        noPhoneCount++;
+                        continue;
+                    }
+
+                    let exists = militants.some(m => cleanPhone(m.phone) === phone);
+                    if (!exists) {
+                        militants.push({ name, lastname, company, city, phone });
+                        addedCount++;
+                    } else {
+                        dupCount++;
+                    }
+                }
+
                 sortMilitants();
                 saveData(); 
                 renderMilitants(); 
