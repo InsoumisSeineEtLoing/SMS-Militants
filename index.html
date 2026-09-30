@@ -12,15 +12,7 @@
     <meta name="msapplication-TileImage" content="app-icon.png">
     
     <!-- Manifeste PWA -->
-    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
-      'name': 'SMS Militants',
-      'short_name': 'SMS Militants',
-      'start_url': '.',
-      'display': 'standalone',
-      'background_color': '#f4f6f9',
-      'theme_color': '#e53935',
-      'icons': [{ 'src': 'app-icon.png', 'sizes': '512x512', 'type': 'image/png' }]
-    }">
+    <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{&quot;name&quot;:&quot;SMS Militants&quot;,&quot;short_name&quot;:&quot;SMS Militants&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#f4f6f9&quot;,&quot;theme_color&quot;:&quot;#e53935&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;app-icon.png&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/png&quot;}]}">
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
@@ -676,17 +668,17 @@
                 let listHtml = '';
                 catList.forEach((msg, idx) => {
                     listHtml += `<li class="list-group-item">
-                        <span style="flex:1; margin-right:10px;">${msg}</span>
-                        <button onclick="deleteTemplate('${cat}', ${idx})" class="delete-btn">✕</button>
+                        <span>${msg}</span>
+                        <button class="delete-btn" onclick="deleteTemplate('${cat}', ${idx})">✕</button>
                     </li>`;
                 });
 
-                container.innerHTML += `<div style="margin-bottom:15px; background:#f8fafc; padding:10px; border-radius:8px; border:1px solid #e2e8f0;">
-                    <div style="font-weight:bold; margin-bottom:8px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between; align-items:center;">
-                        <span>${catLabel}</span>
-                        <button onclick="deleteCategory('${cat}')" class="delete-btn" style="font-size:0.75rem;">Supprimer catégorie</button>
+                container.innerHTML += `<div style="margin-bottom:15px; background:#f7fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px;">
+                    <div style="display:flex; justify-size:space-between; align-items:center; border-bottom:1px solid #cbd5e0; padding-bottom:5px; margin-bottom:8px;">
+                        <strong style="color:var(--primary-dark); font-size:0.95rem;">${catLabel}</strong>
+                        <button class="delete-btn" style="font-size:0.8rem;" onclick="deleteCategory('${cat}')">Supprimer catégorie</button>
                     </div>
-                    <ul class="list-group">${listHtml || '<li class="list-group-item" style="color:var(--gray);">Aucun message</li>'}</ul>
+                    <ul class="list-group">${listHtml || '<li style="font-size:0.85rem; color:var(--gray);">Aucun message dans cette catégorie.</li>'}</ul>
                 </div>`;
             }
         }
@@ -695,59 +687,25 @@
             const cat = document.getElementById('template-cat').value;
             const text = document.getElementById('new-template').value.trim();
             if(!text) return;
-            if(templates[cat]) {
-                if(!templates[cat].list) templates[cat].list = [];
-                templates[cat].list.push(text);
-                saveData();
-                document.getElementById('new-template').value = '';
-                renderTemplates();
-            }
+            if(!templates[cat].list) templates[cat].list = [];
+            templates[cat].list.push(text);
+            saveData();
+            document.getElementById('new-template').value = '';
+            renderTemplates();
         }
 
-        function deleteTemplate(cat, idx) {
-            if(templates[cat] && templates[cat].list) {
-                templates[cat].list.splice(idx, 1);
-                saveData();
-                renderTemplates();
-            }
+        function deleteTemplate(cat, index) {
+            templates[cat].list.splice(index, 1);
+            saveData();
+            renderTemplates();
         }
 
         function deleteCategory(cat) {
-            if(confirm("Supprimer cette catégorie et ses messages ?")) {
+            if(confirm("Supprimer cette catégorie et tous ses messages ?")) {
                 delete templates[cat];
                 saveData();
                 renderTemplates();
             }
-        }
-
-        function renderMilitants() {
-            const ul = document.getElementById('militants-ul');
-            if(!ul) return;
-            ul.innerHTML = '';
-            
-            const search = (document.getElementById('militant-search')?.value || '').toLowerCase();
-            
-            militants.forEach((m, idx) => {
-                const fullname = `${m.name || ''} ${m.lastname || ''}`.toLowerCase();
-                const company = (m.company || '').toLowerCase();
-                const city = (m.city || '').toLowerCase();
-                
-                if(search && !fullname.includes(search) && !company.includes(search) && !city.includes(search)) return;
-
-                ul.innerHTML += `<li class="list-group-item">
-                    <div>
-                        <strong>${m.name || ''} ${m.lastname || ''}</strong>
-                        <div style="font-size:0.8rem; color:var(--gray);">
-                            ${m.company ? `<span class="tag bg-gray" style="font-size:0.7rem; padding:2px 6px;">${m.company}</span> ` : ''}
-                            ${m.city ? `📍 ${m.city} | ` : ''} 📞 ${m.phone || 'Non renseigné'}
-                        </div>
-                    </div>
-                    <div>
-                        <button onclick="editMilitant(${idx})" class="edit-btn">✏️</button>
-                        <button onclick="deleteMilitant(${idx})" class="delete-btn">✕</button>
-                    </div>
-                </li>`;
-            });
         }
 
         function addMilitant() {
@@ -757,12 +715,12 @@
             const city = document.getElementById('m-city').value.trim();
             const phone = document.getElementById('m-phone').value.trim();
 
-            if(!name || !phone) { alert("Le prénom et le téléphone sont requis."); return; }
+            if(!name || !phone) { alert("Le prénom et le téléphone sont obligatoires."); return; }
 
-            militants.push({ name, lastname, company, city, phone });
+            militants.push({ id: Date.now().toString(), name, lastname, company, city, phone });
             sortMilitants();
             saveData();
-            
+
             document.getElementById('m-name').value = '';
             document.getElementById('m-lastname').value = '';
             document.getElementById('m-company').value = '';
@@ -771,53 +729,62 @@
             renderMilitants();
         }
 
-        function editMilitant(idx) {
-            const m = militants[idx];
-            const name = prompt("Prénom :", m.name || '');
-            if(name === null) return;
-            const lastname = prompt("Nom :", m.lastname || '');
-            const company = prompt("Tag / Entreprise :", m.company || '');
-            const city = prompt("Ville :", m.city || '');
-            const phone = prompt("Téléphone :", m.phone || '');
-
-            militants[idx] = { name, lastname, company, city, phone };
-            sortMilitants();
-            saveData();
-            renderMilitants();
-        }
-
-        function deleteMilitant(idx) {
+        function deleteMilitant(id) {
             if(confirm("Supprimer ce militant ?")) {
-                militants.splice(idx, 1);
+                militants = militants.filter(m => m.id !== id);
                 saveData();
                 renderMilitants();
             }
         }
 
+        function renderMilitants() {
+            const ul = document.getElementById('militants-ul');
+            if(!ul) return;
+            ul.innerHTML = '';
+            const search = (document.getElementById('militant-search')?.value || '').toLowerCase();
+
+            const filtered = militants.filter(m => {
+                const fullStr = `${m.name || ''} ${m.lastname || ''} ${m.company || ''} ${m.city || ''} ${m.phone || ''}`.toLowerCase();
+                return fullStr.includes(search);
+            });
+
+            filtered.forEach(m => {
+                ul.innerHTML += `<li class="list-group-item">
+                    <div>
+                        <strong>${m.name} ${m.lastname || ''}</strong>
+                        ${m.company ? `<span class="tag bg-purple" style="font-size:0.7rem; margin-left:5px;">${m.company}</span>` : ''}
+                        ${m.city ? `<span class="tag bg-gray" style="font-size:0.7rem; margin-left:3px;">📍 ${m.city}</span>` : ''}
+                        <br><small style="color:var(--gray);">${m.phone}</small>
+                    </div>
+                    <button class="delete-btn" onclick="deleteMilitant('${m.id}')">✕</button>
+                </li>`;
+            });
+        }
+
         function processCSVImport() {
             const fileInput = document.getElementById('csv-file');
+            if (!fileInput.files.length) { alert("Sélectionne un fichier CSV !"); return; }
             const file = fileInput.files[0];
-            if(!file) { alert("Veuillez sélectionner un fichier CSV."); return; }
-
             const reader = new FileReader();
+
             reader.onload = function(e) {
                 const text = e.target.result;
                 const lines = text.split('\n');
-                let importedCount = 0;
+                let addedCount = 0;
 
-                lines.forEach((line, index) => {
-                    if(!line.trim() || index === 0) return; // Saut de l'en-tête
-                    const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
-                    if(cols.length >= 2) {
-                        const name = cols[0] || '';
+                lines.forEach((line, idx) => {
+                    if (idx === 0 || !line.trim()) return;
+                    const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+                    if (cols.length >= 2) {
+                        const name = cols[0];
                         const lastname = cols[1] || '';
                         const phone = cols[2] || '';
                         const company = cols[3] || '';
                         const city = cols[4] || '';
 
-                        if(name && phone) {
-                            militants.push({ name, lastname, phone, company, city });
-                            importedCount++;
+                        if (name && phone) {
+                            militants.push({ id: (Date.now() + idx).toString(), name, lastname, company, city, phone });
+                            addedCount++;
                         }
                     }
                 });
@@ -825,10 +792,50 @@
                 sortMilitants();
                 saveData();
                 renderMilitants();
-                alert(`${importedCount} militants importés avec succès !`);
+                alert(`${addedCount} militants importés avec succès !`);
                 fileInput.value = '';
             };
+
             reader.readAsText(file);
+        }
+
+        function getEventStats(eventId) {
+            let stats = { total: 0, pending: 0, confirmed: 0, declined: 0, no_answer: 0 };
+            const campaignKey = 'event_' + eventId;
+            const camp = campaigns[campaignKey];
+            if (!camp || !camp.statuses) return stats;
+
+            Object.values(camp.statuses).forEach(status => {
+                stats.total++;
+                if (status === 'pending') stats.pending++;
+                else if (status === 'confirmed') stats.confirmed++;
+                else if (status === 'declined') stats.declined++;
+                else if (status === 'no_answer') stats.no_answer++;
+            });
+
+            return stats;
+        }
+
+        function getEventStatsHTML(eventId) {
+            const s = getEventStats(eventId);
+            if (s.total === 0) return `<span style="font-size:0.8rem; color:var(--gray);">Aucune campagne liée.</span>`;
+            
+            return `
+                <div style="margin-top:6px; font-size:0.8rem;">
+                    <span class="stats-badge bg-info" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'all');">Total: ${s.total}</span>
+                    <span class="stats-badge bg-warning" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'pending');">⌛ Attente: ${s.pending}</span>
+                    <span class="stats-badge bg-success" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'confirmed');">✅ Venus: ${s.confirmed}</span>
+                    <span class="stats-badge bg-danger" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'declined');">❌ Absents: ${s.declined}</span>
+                    <span class="stats-badge bg-gray" style="color:white;" onclick="switchView('campaigns'); filterCampaignByStatus('${eventId}', 'no_answer');">❓ Sans rép.: ${s.no_answer}</span>
+                </div>
+            `;
+        }
+
+        function filterCampaignByStatus(eventId, status) {
+            const campaignKey = 'event_' + eventId;
+            activeCampaignFilters[campaignKey] = status;
+            expandedCampaigns[campaignKey] = true;
+            renderCampaigns();
         }
 
         function renderCalendarEvents() {
@@ -836,110 +843,110 @@
             if(!container) return;
             container.innerHTML = '';
 
-            const startDate = document.getElementById('filter-start').value;
-            const endDate = document.getElementById('filter-end').value;
-
-            const now = new Date();
-            now.setHours(0,0,0,0);
+            const startDate = document.getElementById('filter-start')?.value;
+            const endDate = document.getElementById('filter-end')?.value;
+            const today = new Date().toISOString().split('T')[0];
 
             let filtered = calendarEvents.filter(ev => {
-                const evDate = new Date(ev.date);
-                if(currentTab === 'upcoming' && evDate < now) return false;
-                if(currentTab === 'past' && evDate >= now) return false;
-                if(startDate && ev.date < startDate) return false;
-                if(endDate && ev.date > endDate) return false;
+                const evDate = ev.date;
+                if(currentTab === 'upcoming' && evDate < today) return false;
+                if(currentTab === 'past' && evDate >= today) return false;
+                if(startDate && evDate < startDate) return false;
+                if(endDate && evDate > endDate) return false;
                 return true;
             });
 
+            filtered.sort((a, b) => currentTab === 'upcoming' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
+
             if(filtered.length === 0) {
-                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucun événement dans cette section.</p>`;
+                container.innerHTML = `<p style="font-size:0.9rem; color:var(--gray);">Aucun événement dans cette section.</p>`;
                 return;
             }
 
-            filtered.sort((a,b) => currentTab === 'upcoming' ? new Date(a.date) - new Date(b.date) : new Date(b.date) - new Date(a.date));
-
+            let html = '<div class="events-scroll-box">';
             filtered.forEach(ev => {
-                const isConfigured = campaigns[ev.id] ? true : false;
-                container.innerHTML += `<div class="sms-item">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                        <div>
-                            <strong style="font-size:1.05rem; color:var(--primary-dark);">${ev.action}</strong>
-                            <div style="font-size:0.85rem; color:var(--gray); margin-top:2px;">
-                                📅 ${ev.date} | 📍 ${ev.lieu || 'Non précisé'}
+                html += `
+                    <div class="sms-item">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                            <div>
+                                <strong style="font-size:1.05rem; color:var(--primary-dark);">${ev.title || 'Événement sans titre'}</strong><br>
+                                <small style="color:var(--gray);">📅 ${ev.date || 'Date inconnue'} | 📍 ${ev.location || 'Lieu non spécifié'}</small>
                             </div>
+                            <button onclick="openMilitantModal('${ev.id}')" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--info);">🎯 Sélectionner</button>
                         </div>
-                        <span class="tag ${isConfigured ? 'bg-success' : 'bg-warning'}">
-                            ${isConfigured ? 'Campagne créée' : 'À configurer'}
-                        </span>
+                        ${getEventStatsHTML(ev.id)}
                     </div>
-                    <button onclick="openMilitantModal('${ev.id}')" style="margin-top:12px; font-size:0.85rem; padding:8px 12px; background:${isConfigured ? 'var(--info)' : 'var(--primary)'};">
-                        ${isConfigured ? '✏️ Modifier les militants' : '➕ Lancer une campagne'}
-                    </button>
-                </div>`;
+                `;
             });
+            html += '</div>';
+            container.innerHTML = html;
         }
 
         function openMilitantModal(eventId) {
             modalTargetEventId = eventId;
-            modalCachedEventData = calendarEvents.find(e => e.id === eventId);
+            const ev = calendarEvents.find(e => e.id === eventId);
+            if(!ev) return;
+            modalCachedEventData = ev;
+
+            document.getElementById('modal-title').innerText = `Campagne pour : ${ev.title}`;
             
-            document.getElementById('modal-step-tags').style.display = 'flex';
-            document.getElementById('modal-step-militants').style.display = 'none';
+            // Étape 1 : Récupérer tous les tags/entreprises uniques des militants
+            const tags = Array.from(new Set(militants.map(m => m.company).filter(Boolean))).sort();
+            const tagsContainer = document.getElementById('modal-tags-checkboxes-container');
+            tagsContainer.innerHTML = '';
 
-            // Récupérer les tags uniques des militants
-            const tags = Array.from(new Set(militants.map(m => m.company).filter(Boolean)));
-            const container = document.getElementById('modal-tags-checkboxes-container');
-            container.innerHTML = '';
-
-            if(tags.length === 0) {
-                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucun tag/entreprise trouvé chez les militants.</p>`;
+            if (tags.length === 0) {
+                tagsContainer.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucun tag/entreprise associé aux militants.</p>`;
             } else {
-                tags.forEach(t => {
-                    container.innerHTML += `<label class="modal-item-row">
-                        <input type="checkbox" class="modal-tag-cb" value="${t}" checked>
-                        <span>${t}</span>
-                    </label>`;
+                tags.forEach(tag => {
+                    tagsContainer.innerHTML += `
+                        <label class="modal-item-row">
+                            <input type="checkbox" class="modal-tag-checkbox" value="${tag}" checked>
+                            <span>${tag}</span>
+                        </label>
+                    `;
                 });
             }
 
+            document.getElementById('modal-step-tags').style.display = 'flex';
+            document.getElementById('modal-step-militants').style.display = 'none';
             document.getElementById('militant-modal').classList.add('open');
         }
 
-        function closeMilitantModal() {
-            document.getElementById('militant-modal').classList.remove('open');
-        }
-
-        function toggleSelectAllTags(status) {
-            document.querySelectorAll('.modal-tag-cb').forEach(cb => cb.checked = status);
+        function toggleSelectAllTags(select) {
+            document.querySelectorAll('.modal-tag-checkbox').forEach(cb => cb.checked = select);
         }
 
         function goToModalMilitantsStep() {
-            document.getElementById('modal-step-tags').style.display = 'none';
-            document.getElementById('modal-step-militants').style.display = 'flex';
-
-            const selectedTags = Array.from(document.querySelectorAll('.modal-tag-cb:checked')).map(cb => cb.value);
+            const selectedTags = Array.from(document.querySelectorAll('.modal-tag-checkbox:checked')).map(cb => cb.value);
             
-            // Pré-sélectionner les militants correspondant aux tags
-            const existingCamp = campaigns[modalTargetEventId];
-            const existingIds = existingCamp ? existingCamp.militants.map(m => m.phone) : [];
+            // On coche par défaut tous les militants qui correspondent aux tags choisis
+            const campaignKey = 'event_' + modalTargetEventId;
+            const existingCamp = campaigns[campaignKey] || {};
+            const existingStatuses = existingCamp.statuses || {};
 
             const listContainer = document.getElementById('modal-militants-list');
             listContainer.innerHTML = '';
 
-            militants.forEach((m, idx) => {
-                const matchesTag = selectedTags.includes(m.company);
-                const isChecked = existingCamp ? existingIds.includes(m.phone) : matchesTag;
+            militants.forEach(m => {
+                const isTagMatch = selectedTags.includes(m.company);
+                const isAlreadyInCamp = existingStatuses.hasOwnProperty(m.id);
+                const isChecked = isTagMatch || isAlreadyInCamp;
 
-                listContainer.innerHTML += `<label class="modal-item-row militant-modal-row" data-search="${(m.name + ' ' + m.lastname + ' ' + m.city).toLowerCase()}">
-                    <input type="checkbox" class="modal-militant-cb" value="${idx}" ${isChecked ? 'checked' : ''}>
-                    <div>
-                        <strong>${m.name || ''} ${m.lastname || ''}</strong>
-                        <div style="font-size:0.75rem; color:var(--gray);">
-                            ${m.company ? `[${m.company}] ` : ''}${m.city || ''} - 📞 ${m.phone}
+                listContainer.innerHTML += `
+                    <label class="modal-item-row militant-row-item" data-id="${m.id}" data-search="${(m.name + ' ' + (m.lastname||'') + ' ' + (m.city||'')).toLowerCase()}">
+                        <input type="checkbox" class="modal-militant-checkbox" value="${m.id}" ${isChecked ? 'checked' : ''}>
+                        <div>
+                            <strong>${m.name} ${m.lastname || ''}</strong>
+                            ${m.company ? `<span class="tag bg-purple" style="font-size:0.7rem; margin-left:5px;">${m.company}</span>` : ''}
+                            ${m.city ? `<span class="tag bg-gray" style="font-size:0.7rem; margin-left:3px;">📍 ${m.city}</span>` : ''}
                         </div>
-                    </div>
-                </label>`;
+                    </label>
+                `;
             });
+
+            document.getElementById('modal-step-tags').style.display = 'none';
+            document.getElementById('modal-step-militants').style.display = 'flex';
         }
 
         function backToModalTagsStep() {
@@ -947,48 +954,67 @@
             document.getElementById('modal-step-militants').style.display = 'none';
         }
 
-        function toggleSelectAllMilitants(status) {
-            document.querySelectorAll('.modal-militant-cb').forEach(cb => {
-                if(cb.closest('.modal-item-row').style.display !== 'none') {
-                    cb.checked = status;
-                }
-            });
+        function toggleSelectAllMilitants(select) {
+            document.querySelectorAll('.militant-row-item:not([style*="display: none"]) .modal-militant-checkbox').forEach(cb => cb.checked = select);
         }
 
         function renderModalMilitantsList() {
-            const query = document.getElementById('modal-search').value.toLowerCase();
-            document.querySelectorAll('.militant-modal-row').forEach(row => {
-                const searchData = row.getAttribute('data-search');
-                row.style.display = searchData.includes(query) ? 'flex' : 'none';
+            const search = document.getElementById('modal-search').value.toLowerCase();
+            document.querySelectorAll('.militant-row-item').forEach(row => {
+                const text = row.getAttribute('data-search');
+                row.style.display = text.includes(search) ? 'flex' : 'none';
             });
         }
 
-        function confirmCampaignSelection() {
-            const selectedIndices = Array.from(document.querySelectorAll('.modal-militant-cb:checked')).map(cb => parseInt(cb.value));
-            const selectedMilitants = selectedIndices.map(idx => militants[idx]);
+        function closeMilitantModal() {
+            document.getElementById('militant-modal').classList.remove('open');
+        }
 
-            if(!campaigns[modalTargetEventId]) {
-                campaigns[modalTargetEventId] = {
-                    event: modalCachedEventData,
-                    militants: selectedMilitants.map(m => ({
-                        ...m,
-                        status: 'pending',
-                        history: []
-                    }))
+        function confirmCampaignSelection() {
+            const campaignKey = 'event_' + modalTargetEventId;
+            const selectedMilitantIds = Array.from(document.querySelectorAll('.modal-militant-checkbox:checked')).map(cb => cb.value);
+
+            if (!campaigns[campaignKey]) {
+                campaigns[campaignKey] = {
+                    title: modalCachedEventData.title || 'Action',
+                    date: modalCachedEventData.date || '',
+                    location: modalCachedEventData.location || '',
+                    statuses: {}
                 };
-            } else {
-                // Mise à jour de la liste en conservant les historiques existants
-                const oldMilitants = campaigns[modalTargetEventId].militants || [];
-                campaigns[modalTargetEventId].militants = selectedMilitants.map(m => {
-                    const existing = oldMilitants.find(om => om.phone === m.phone);
-                    return existing ? existing : { ...m, status: 'pending', history: [] };
-                });
             }
 
+            // Conserver les statuts existants et ajouter 'pending' pour les nouveaux
+            let updatedStatuses = {};
+            selectedMilitantIds.forEach(id => {
+                updatedStatuses[id] = campaigns[campaignKey].statuses?.[id] || 'pending';
+            });
+
+            campaigns[campaignKey].statuses = updatedStatuses;
             saveData();
             closeMilitantModal();
             renderUI();
             alert("Campagne mise à jour !");
+        }
+
+        function updateMilitantStatus(campaignKey, militantId, newStatus) {
+            if(campaigns[campaignKey] && campaigns[campaignKey].statuses) {
+                campaigns[campaignKey].statuses[militantId] = newStatus;
+                saveData();
+                renderUI();
+            }
+        }
+
+        function removeMilitantFromCampaign(campaignKey, militantId) {
+            if(confirm("Retirer ce militant de la campagne ?")) {
+                delete campaigns[campaignKey].statuses[militantId];
+                saveData();
+                renderUI();
+            }
+        }
+
+        function toggleCampaignExpansion(campaignKey) {
+            expandedCampaigns[campaignKey] = !expandedCampaigns[campaignKey];
+            renderCampaigns();
         }
 
         function renderCampaigns() {
@@ -996,210 +1022,344 @@
             if(!container) return;
             container.innerHTML = '';
 
-            const sortOrder = document.getElementById('campaign-sort-order').value;
-            const now = new Date();
-            now.setHours(0,0,0,0);
+            const today = new Date().toISOString().split('T')[0];
+            const sortOrder = document.getElementById('campaign-sort-order')?.value || 'asc';
 
-            let keys = Object.keys(campaigns);
-
-            keys = keys.filter(k => {
-                const evDate = new Date(campaigns[k].event.date);
-                return currentCampTab === 'current' ? evDate >= now : evDate < now;
+            let keys = Object.keys(campaigns).filter(k => {
+                const c = campaigns[k];
+                if(currentCampTab === 'current' && c.date < today) return false;
+                if(currentCampTab === 'past' && c.date >= today) return false;
+                return true;
             });
 
-            keys.sort((a,b) => {
-                const dateA = new Date(campaigns[a].event.date);
-                const dateB = new Date(campaigns[b].event.date);
-                return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            keys.sort((a, b) => {
+                const dateA = campaigns[a].date || '';
+                const dateB = campaigns[b].date || '';
+                return sortOrder === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
             });
 
             if(keys.length === 0) {
-                container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Aucune campagne dans cette catégorie.</p>`;
+                container.innerHTML = `<p style="font-size:0.9rem; color:var(--gray);">Aucune campagne dans cette section.</p>`;
                 return;
             }
 
             keys.forEach(k => {
-                const camp = campaigns[k];
-                const ev = camp.event;
-                const isExpanded = expandedCampaigns[k] || false;
-                const filter = activeCampaignFilters[k] || 'all';
-                const search = (campaignSearches[k] || '').toLowerCase();
+                const c = campaigns[k];
+                const isExpanded = !!expandedCampaigns[k];
+                const currentFilter = activeCampaignFilters[k] || 'all';
+                const currentSort = activeCampaignSorts[k] || 'name';
+                const searchVal = (campaignSearches[k] || '').toLowerCase();
 
-                let filteredMilitants = camp.militants.filter(m => {
-                    if(filter !== 'all' && m.status !== filter) return false;
-                    const full = `${m.name || ''} ${m.lastname || ''} ${m.company || ''} ${m.city || ''}`.toLowerCase();
-                    if(search && !full.includes(search)) return false;
-                    return true;
+                let militantEntries = Object.entries(c.statuses || {}).map(([mId, status]) => {
+                    const m = militants.find(x => x.id === mId) || { id: mId, name: 'Inconnu', lastname: '', company: '', phone: '' };
+                    return { m, status };
                 });
 
-                let total = camp.militants.length;
-                let present = camp.militants.filter(m => m.status === 'present').length;
-                let absent = camp.militants.filter(m => m.status === 'absent').length;
-                let pending = camp.militants.filter(m => m.status === 'pending').length;
-
-                let militantsHtml = '';
-                if(isExpanded) {
-                    filteredMilitants.forEach((m, mIdx) => {
-                        militantsHtml += `<div class="list-group-item" style="flex-direction:column; align-items:stretch; background:#fff; margin-bottom:8px; border-radius:6px; border:1px solid #e2e8f0;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <strong>${m.name || ''} ${m.lastname || ''}</strong>
-                                    <span style="font-size:0.75rem; color:var(--gray);">(${m.company || 'Sans tag'})</span>
-                                </div>
-                                <select onchange="updateMilitantStatus('${k}', ${mIdx}, this.value)" style="width:auto; margin-bottom:0; font-size:0.8rem; padding:2px 6px;">
-                                    <option value="pending" ${m.status === 'pending' ? 'selected' : ''}>⏳ En attente</option>
-                                    <option value="present" ${m.status === 'present' ? 'selected' : ''}>✅ Présent</option>
-                                    <option value="absent" ${m.status === 'absent' ? 'selected' : ''}>❌ Absent</option>
-                                </select>
-                            </div>
-                            <div style="display:flex; gap:6px; margin-top:8px;">
-                                <button onclick="prepareSMS('${k}', ${mIdx})" class="btn-secondary" style="font-size:0.75rem; padding:4px 8px; flex:1;">💬 Envoyer SMS</button>
-                            </div>
-                        </div>`;
+                // Filtrage
+                if(currentFilter !== 'all') {
+                    militantEntries = militantEntries.filter(item => item.status === currentFilter);
+                }
+                if(searchVal) {
+                    militantEntries = militantEntries.filter(item => {
+                        const fullStr = `${item.m.name} ${item.m.lastname} ${item.m.company} ${item.m.city} ${item.m.phone}`.toLowerCase();
+                        return fullStr.includes(searchVal);
                     });
                 }
 
-                container.innerHTML += `<div class="card" style="border:1px solid #e2e8f0;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleCampaignExpand('${k}')">
-                        <div>
-                            <h3 style="margin:0; font-size:1.05rem; color:var(--primary-dark);">${ev.action}</h3>
-                            <div style="font-size:0.8rem; color:var(--gray);">📅 ${ev.date} | 📍 ${ev.lieu || 'N/C'}</div>
-                        </div>
-                        <span>${isExpanded ? '▲' : '▼'}</span>
-                    </div>
+                // Tri
+                militantEntries.sort((a, b) => {
+                    if(currentSort === 'status') return a.status.localeCompare(b.status);
+                    if(currentSort === 'company') return (a.m.company||'').localeCompare(b.m.company||'');
+                    return (a.m.name||'').localeCompare(b.m.name||'');
+                });
 
-                    <div style="margin-top:10px;">
-                        <span class="stats-badge bg-info">Total: ${total}</span>
-                        <span class="stats-badge bg-success">Présents: ${present}</span>
-                        <span class="stats-badge bg-danger">Absents: ${absent}</span>
-                        <span class="stats-badge bg-warning">En attente: ${pending}</span>
-                    </div>
+                let listHtml = '';
+                militantEntries.forEach(({ m, status }) => {
+                    const statusColors = { pending: 'bg-warning', confirmed: 'bg-success', declined: 'bg-danger', no_answer: 'bg-gray' };
+                    const statusLabels = { pending: '⌛ En attente', confirmed: '✅ Présent', declined: '❌ Absent', no_answer: '❓ Sans réponse' };
 
-                    ${isExpanded ? `
-                        <div style="margin-top:15px; border-top:1px solid #edf2f7; padding-top:10px;">
-                            <input type="text" placeholder="🔍 Rechercher un militant..." value="${campaignSearches[k] \vert{}\vert{} ''}" oninput="setCampaignSearch('${k}', this.value)" style="font-size:0.8rem; margin-bottom:10px;">
-                            <div style="display:flex; gap:5px; margin-bottom:10px; overflow-x:auto;">
-                                <button onclick="setCampaignFilter('${k}', 'all')" class="btn-secondary" style="font-size:0.7rem; padding:4px 8px; ${filter === 'all' ? 'background:var(--primary);' : ''}">Tous</button>
-                                <button onclick="setCampaignFilter('${k}', 'present')" class="btn-secondary" style="font-size:0.7rem; padding:4px 8px; ${filter === 'present' ? 'background:var(--success);' : ''}">Présents</button>
-                                <button onclick="setCampaignFilter('${k}', 'absent')" class="btn-secondary" style="font-size:0.7rem; padding:4px 8px; ${filter === 'absent' ? 'background:var(--danger);' : ''}">Absents</button>
-                                <button onclick="setCampaignFilter('${k}', 'pending')" class="btn-secondary" style="font-size:0.7rem; padding:4px 8px; ${filter === 'pending' ? 'background:var(--warning);' : ''}">En attente</button>
+                    // Génération du lien SMS
+                    let catKey = 'first';
+                    if (status === 'pending') catKey = 'reminder1';
+                    else if (status === 'no_answer') catKey = 'reminder2';
+                    
+                    let templateList = (templates[catKey] && templates[catKey].list) ? templates[catKey].list : [];
+                    let rawMsg = templateList[0] || "Salut {prenom}, rdv pour {action} le {date} à {lieu}";
+                    let msgText = rawMsg
+                        .replace(/{prenom}/g, m.name || '')
+                        .replace(/{action}/g, c.title || '')
+                        .replace(/{date}/g, c.date || '')
+                        .replace(/{lieu}/g, c.location || '');
+
+                    let smsHref = `sms:${m.phone}?body=${encodeURIComponent(msgText)}`;
+
+                    listHtml += `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-bottom:8px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <strong>${m.name} ${m.lastname || ''}</strong>
+                                    ${m.company ? `<span class="tag bg-purple" style="font-size:0.65rem;">${m.company}</span>` : ''}
+                                    <br><small style="color:var(--gray);">${m.phone}</small>
+                                </div>
+                                <span class="tag ${statusColors[status]}">${statusLabels[status]}</span>
                             </div>
-                            <div>${militantsHtml || '<p style="font-size:0.8rem; color:var(--gray);">Aucun militant trouvé.</p>'}</div>
+                            <div style="display:flex; gap:6px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                                <select onchange="updateMilitantStatus('${k}', '${m.id}', this.value)" style="width:auto; margin-bottom:0; font-size:0.75rem; padding:4px;">
+                                    <option value="pending" ${status==='pending'?'selected':''}>⌛ En attente</option>
+                                    <option value="confirmed" ${status==='confirmed'?'selected':''}>✅ Présent</option>
+                                    <option value="declined" ${status==='declined'?'selected':''}>❌ Absent</option>
+                                    <option value="no_answer" ${status==='no_answer'?'selected':''}>❓ Sans réponse</option>
+                                </select>
+                                <a href="${smsHref}" style="background:var(--info); color:white; padding:4px 8px; border-radius:4px; font-size:0.75rem; text-decoration:none; font-weight:bold;">💬 SMS</a>
+                                <button onclick="removeMilitantFromCampaign('${k}', '${m.id}')" class="delete-btn" style="font-size:0.75rem;">Retirer</button>
+                            </div>
                         </div>
-                    ` : ''}
-                </div>`;
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="card" style="padding:15px; border:1px solid #e2e8f0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong style="font-size:1.1rem; color:var(--primary-dark);">${c.title}</strong><br>
+                                <small style="color:var(--gray);">📅 ${c.date} | 📍 ${c.location}</small>
+                            </div>
+                            <button onclick="toggleCampaignExpansion('${k}')" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">
+                                ${isExpanded ? '▲ Masquer' : '▼ Dérouler'}
+                            </button>
+                        </div>
+                        
+                        ${getEventStatsHTML(k.replace('event_', ''))}
+
+                        ${isExpanded ? `
+                            <div style="margin-top:15px; border-top:1px solid #edf2f7; padding-top:10px;">
+                                <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+                                    <input type="text" placeholder="🔍 Rechercher dans la campagne..." value="${campaignSearches[k]\vert{}\vert{}''}" oninput="campaignSearches['${k}']=this.value; renderCampaigns();" style="margin-bottom:0; font-size:0.8rem; flex:1; min-width:140px;">
+                                    <select onchange="activeCampaignSorts['${k}']=this.value; renderCampaigns();" style="width:auto; margin-bottom:0; font-size:0.8rem;">
+                                        <option value="name" ${currentSort==='name'?'selected':''}>Nom</option>
+                                        <option value="company" ${currentSort==='company'?'selected':''}>Tag/Entreprise</option>
+                                        <option value="status" ${currentSort==='status'?'selected':''}>Statut</option>
+                                    </select>
+                                </div>
+                                <div>${listHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond au filtre.</p>'}</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
             });
-        }
-
-        function toggleCampaignExpand(key) {
-            expandedCampaigns[key] = !expandedCampaigns[key];
-            renderCampaigns();
-        }
-
-        function setCampaignFilter(key, filter) {
-            activeCampaignFilters[key] = filter;
-            renderCampaigns();
-        }
-
-        function setCampaignSearch(key, query) {
-            campaignSearches[key] = query;
-            renderCampaigns();
-        }
-
-        function updateMilitantStatus(campKey, mIdx, status) {
-            campaigns[campKey].militants[mIdx].status = status;
-            saveData();
-            renderCampaigns();
-        }
-
-        function prepareSMS(campKey, mIdx) {
-            const camp = campaigns[campKey];
-            const m = camp.militants[mIdx];
-            const ev = camp.event;
-
-            // Choix du template
-            let catKeys = Object.keys(templates);
-            if(catKeys.length === 0) { alert("Aucun message type disponible."); return; }
-
-            let choice = prompt(`Choisissez le message à envoyer :\n` + catKeys.map((k, idx) => `${idx + 1}. ${templates[k].label}`).join('\n'));
-            let selectedCat = catKeys[parseInt(choice) - 1];
-
-            if(selectedCat && templates[selectedCat].list.length > 0) {
-                let msgTemplate = templates[selectedCat].list[0];
-                let msg = msgTemplate
-                    .replace(/{prenom}/g, m.name || '')
-                    .replace(/{action}/g, ev.action || '')
-                    .replace(/{date}/g, ev.date || '')
-                    .replace(/{lieu}/g, ev.lieu || '');
-
-                // Enregistrement de l'historique
-                if(!m.history) m.history = [];
-                m.history.push({ date: new Date().toISOString(), text: msg });
-                saveData();
-
-                // Lien SMS URLEncoded
-                window.open(`sms:${m.phone}?body=${encodeURIComponent(msg)}`, '_self');
-            }
         }
 
         function renderDetailedStats() {
-            const globalContainer = document.getElementById('global-stats-container');
             const container = document.getElementById('detailed-stats-container');
-            if(!container) return;
+            const globalContainer = document.getElementById('global-stats-container');
+            const filterWrapper = document.getElementById('stat-filter-input-wrapper');
+            const filterLabel = document.getElementById('stat-filter-label');
+            if(!container || !globalContainer) return;
 
-            const start = document.getElementById('stat-period-start').value;
-            const end = document.getElementById('stat-period-end').value;
+            const pStart = document.getElementById('stat-period-start')?.value;
+            const pEnd = document.getElementById('stat-period-end')?.value;
 
-            let totalSMS = 0;
-            let totalPresent = 0;
-            let totalAbsent = 0;
+            // Filtrage global par période
+            let filteredCampaigns = Object.entries(campaigns).filter(([k, c]) => {
+                if(pStart && c.date < pStart) return false;
+                if(pEnd && c.date > pEnd) return false;
+                return true;
+            });
 
-            Object.keys(campaigns).forEach(k => {
-                const camp = campaigns[k];
-                const evDate = camp.event.date;
-                if(start && evDate < start) return;
-                if(end && evDate > end) return;
+            // Mise à jour de l'interface des filtres spécifiques selon l'onglet actif
+            if(filterWrapper) {
+                if(currentStatTab === 'date') {
+                    filterLabel.innerText = "Filtrer par statut :";
+                    filterWrapper.innerHTML = `
+                        <select id="stat-status-filter" onchange="globalStatStatusFilter=this.value; renderDetailedStats();" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                            <option value="all" ${globalStatStatusFilter==='all'?'selected':''}>Tous les statuts</option>
+                            <option value="confirmed" ${globalStatStatusFilter==='confirmed'?'selected':''}>✅ Présents</option>
+                            <option value="declined" ${globalStatStatusFilter==='declined'?'selected':''}>❌ Absents</option>
+                            <option value="pending" ${globalStatStatusFilter==='pending'?'selected':''}>⌛ En attente</option>
+                            <option value="no_answer" ${globalStatStatusFilter==='no_answer'?'selected':''}>❓ Sans réponse</option>
+                        </select>
+                    `;
+                } else if(currentStatTab === 'action') {
+                    filterLabel.innerText = "Rechercher une action :";
+                    filterWrapper.innerHTML = `<input type="text" id="stat-action-search" placeholder="Ex: Tractage, Manifestation..." oninput="renderDetailedStats()" style="margin-bottom:0; font-size:0.85rem; background:#fff;">`;
+                } else if(currentStatTab === 'militant') {
+                    filterLabel.innerText = "Rechercher un militant/tag :";
+                    filterWrapper.innerHTML = `<input type="text" id="stat-militant-search" placeholder="Prénom, nom, tag..." oninput="renderDetailedStats()" style="margin-bottom:0; font-size:0.85rem; background:#fff;">`;
+                }
+            }
 
-                camp.militants.forEach(m => {
-                    if(m.status === 'present') totalPresent++;
-                    if(m.status === 'absent') totalAbsent++;
-                    if(m.history) totalSMS += m.history.length;
+            // Calcul des totaux généraux
+            let totalEvents = filteredCampaigns.length;
+            let totalMobilizations = 0;
+            let totalConfirmed = 0;
+            let totalDeclined = 0;
+
+            filteredCampaigns.forEach(([k, c]) => {
+                Object.values(c.statuses || {}).forEach(st => {
+                    totalMobilizations++;
+                    if(st === 'confirmed') totalConfirmed++;
+                    if(st === 'declined') totalDeclined++;
                 });
             });
 
-            globalContainer.innerHTML = `<div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <div style="background:#fff; padding:10px; border-radius:8px; flex:1; text-align:center; border:1px solid #e2e8f0;">
-                    <div style="font-size:1.2rem; font-weight:bold; color:var(--primary);">${totalSMS}</div>
-                    <div style="font-size:0.75rem; color:var(--gray);">SMS envoyés</div>
+            globalContainer.innerHTML = `
+                <div style="display:flex; gap:10px; flex-wrap:wrap; text-align:center;">
+                    <div style="flex:1; background:#fff; padding:10px; border-radius:8px; border:1px solid #feebc8;">
+                        <strong style="font-size:1.2rem; color:var(--primary);">${totalEvents}</strong><br><small style="font-size:0.75rem;">Actions</small>
+                    </div>
+                    <div style="flex:1; background:#fff; padding:10px; border-radius:8px; border:1px solid #feebc8;">
+                        <strong style="font-size:1.2rem; color:var(--info);">${totalMobilizations}</strong><br><small style="font-size:0.75rem;">Sollicitations</small>
+                    </div>
+                    <div style="flex:1; background:#fff; padding:10px; border-radius:8px; border:1px solid #feebc8;">
+                        <strong style="font-size:1.2rem; color:var(--success);">${totalConfirmed}</strong><br><small style="font-size:0.75rem;">Présences</small>
+                    </div>
                 </div>
-                <div style="background:#fff; padding:10px; border-radius:8px; flex:1; text-align:center; border:1px solid #e2e8f0;">
-                    <div style="font-size:1.2rem; font-weight:bold; color:var(--success);">${totalPresent}</div>
-                    <div style="font-size:0.75rem; color:var(--gray);">Présences</div>
-                </div>
-                <div style="background:#fff; padding:10px; border-radius:8px; flex:1; text-align:center; border:1px solid #e2e8f0;">
-                    <div style="font-size:1.2rem; font-weight:bold; color:var(--danger);">${totalAbsent}</div>
-                    <div style="font-size:0.75rem; color:var(--gray);">Absences</div>
-                </div>
-            </div>`;
+            `;
 
-            // Rendu détaillé selon l'onglet
-            container.innerHTML = `<p style="font-size:0.85rem; color:var(--gray);">Statistiques générées sur la période sélectionnée.</p>`;
+            container.innerHTML = '';
+
+            // 1. ONGLET PAR DATE
+            if(currentStatTab === 'date') {
+                filteredCampaigns.sort((a, b) => b[1].date.localeCompare(a[1].date));
+                filteredCampaigns.forEach(([k, c]) => {
+                    let stHtml = '';
+                    Object.entries(c.statuses || {}).forEach(([mId, st]) => {
+                        if(globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
+                        const m = militants.find(x => x.id === mId) || { name: 'Inconnu' };
+                        stHtml += `<li class="list-group-item" style="font-size:0.8rem; padding:6px 10px;">
+                            <span>${m.name} ${m.lastname || ''}</span>
+                            <span class="tag bg-${st==='confirmed'?'success':(st==='declined'?'danger':(st==='pending'?'warning':'gray'))}">${st}</span>
+                        </li>`;
+                    });
+
+                    if(stHtml || globalStatStatusFilter === 'all') {
+                        container.innerHTML += `
+                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:10px;">
+                                <strong style="color:var(--primary-dark);">${c.date} - ${c.title}</strong>
+                                <ul class="list-group" style="margin-top:8px;">${stHtml || '<li style="font-size:0.8rem; color:var(--gray);">Aucune donnée pour ce filtre.</li>'}</ul>
+                            </div>
+                        `;
+                    }
+                });
+            }
+            // 2. ONGLET PAR ACTION
+            else if(currentStatTab === 'action') {
+                const search = (document.getElementById('stat-action-search')?.value || '').toLowerCase();
+                let groupedByAction = {};
+
+                filteredCampaigns.forEach(([k, c]) => {
+                    if(search && !c.title.toLowerCase().includes(search)) return;
+                    if(!groupedByAction[c.title]) groupedByAction[c.title] = { count: 0, confirmed: 0, items: [] };
+                    
+                    let cConf = 0;
+                    Object.values(c.statuses || {}).forEach(st => {
+                        groupedByAction[c.title].count++;
+                        if(st === 'confirmed') { groupedByAction[c.title].confirmed++; cConf++; }
+                    });
+                    groupedByAction[c.title].items.push({ date: c.date, location: c.location, confirmed: cConf });
+                });
+
+                Object.entries(groupedByAction).forEach(([title, data]) => {
+                    let subList = '';
+                    data.items.forEach(item => {
+                        subList += `<li class="list-group-item" style="font-size:0.8rem;">📅 ${item.date} (${item.location}) - <strong>${item.confirmed} venus</strong></li>`;
+                    });
+
+                    container.innerHTML += `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:12px; margin-bottom:10px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <strong style="color:var(--primary-dark);">${title}</strong>
+                                <span class="tag bg-success">${data.confirmed} / ${data.count} présences</span>
+                            </div>
+                            <ul class="list-group" style="margin-top:8px;">${subList}</ul>
+                        </div>
+                    `;
+                });
+            }
+            // 3. ONGLET PAR MILITANT
+            else if(currentStatTab === 'militant') {
+                const search = (document.getElementById('stat-militant-search')?.value || '').toLowerCase();
+                let mStats = {};
+
+                militants.forEach(m => {
+                    mStats[m.id] = { m, solicited: 0, confirmed: 0, declined: 0 };
+                });
+
+                filteredCampaigns.forEach(([k, c]) => {
+                    Object.entries(c.statuses || {}).forEach(([mId, st]) => {
+                        if(!mStats[mId]) return;
+                        mStats[mId].solicited++;
+                        if(st === 'confirmed') mStats[mId].confirmed++;
+                        if(st === 'declined') mStats[mId].declined++;
+                    });
+                });
+
+                let list = Object.values(mStats).filter(item => {
+                    const fullStr = `${item.m.name} ${item.m.lastname} ${item.m.company}`.toLowerCase();
+                    return fullStr.includes(search);
+                });
+
+                list.sort((a, b) => b.confirmed - a.confirmed);
+
+                list.forEach(item => {
+                    const rate = item.solicited > 0 ? Math.round((item.confirmed / item.solicited) * 100) : 0;
+                    container.innerHTML += `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <strong>${item.m.name} ${item.m.lastname || ''}</strong>
+                                ${item.m.company ? `<span class="tag bg-purple" style="font-size:0.65rem;">${item.m.company}</span>` : ''}
+                                <br><small style="color:var(--gray);">${item.solicited} sollicitations | ${item.confirmed} présences (${rate}%)</small>
+                            </div>
+                            <span class="tag bg-info">${rate}% présence</span>
+                        </div>
+                    `;
+                });
+            }
         }
 
         function exportCurrentStatsCSV() {
-            let csvContent = "data:text/csv;charset=utf-8,Action,Date,Militant,Telephone,Statut\n";
-
-            Object.keys(campaigns).forEach(k => {
-                const camp = campaigns[k];
-                camp.militants.forEach(m => {
-                    csvContent += `"${camp.event.action}","${camp.event.date}","${m.name} ${m.lastname}","${m.phone}","${m.status}"\n`;
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            if (currentStatTab === 'date') {
+                csvContent += "Date,Action,Lieu,Militant,Tag,Statut\n";
+                Object.values(campaigns).forEach(c => {
+                    Object.entries(c.statuses || {}).forEach(([mId, st]) => {
+                        const m = militants.find(x => x.id === mId) || { name: 'Inconnu', lastname: '', company: '' };
+                        csvContent += `"${c.date}","${c.title}","${c.location}","${m.name} ${m.lastname}","${m.company}","${st}"\n`;
+                    });
                 });
-            });
+            } else if (currentStatTab === 'militant') {
+                csvContent += "Prenom,Nom,Tag,Sollicitations,Presences,TauxPresence\n";
+                militants.forEach(m => {
+                    let solicited = 0, confirmed = 0;
+                    Object.values(campaigns).forEach(c => {
+                        if (c.statuses && c.statuses[m.id]) {
+                            solicited++;
+                            if (c.statuses[m.id] === 'confirmed') confirmed++;
+                        }
+                    });
+                    let rate = solicited > 0 ? Math.round((confirmed / solicited) * 100) : 0;
+                    csvContent += `"${m.name}","${m.lastname || ''}","${m.company || ''}",${solicited},${confirmed},"${rate}%"\n`;
+                });
+            } else {
+                csvContent += "Action,SollicitationsTotales,PresencesTotales\n";
+                let actionStats = {};
+                Object.values(campaigns).forEach(c => {
+                    if (!actionStats[c.title]) actionStats[c.title] = { solicited: 0, confirmed: 0 };
+                    Object.values(c.statuses || {}).forEach(st => {
+                        actionStats[c.title].solicited++;
+                        if (st === 'confirmed') actionStats[c.title].confirmed++;
+                    });
+                });
+                Object.entries(actionStats).forEach(([title, stat]) => {
+                    csvContent += `"${title}",${stat.solicited},${stat.confirmed}\n`;
+                });
+            }
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "statistiques_militants.csv");
+            link.setAttribute("download", `statistiques_militants_${currentStatTab}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
