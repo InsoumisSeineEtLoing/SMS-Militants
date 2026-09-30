@@ -47,7 +47,6 @@
             header { justify-content: space-around; }
         }
 
-        /* --- MENU BURGER MOBILE --- */
         .burger-btn {
             background: none;
             border: none;
@@ -248,7 +247,6 @@
         <p>Coordination & Statistiques</p>
     </header>
 
-    <!-- MENU COULISSANT (DRAWER) -->
     <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer()"></div>
     <nav id="side-drawer" class="side-drawer">
         <div class="drawer-header">
@@ -318,16 +316,25 @@
         <div id="view-militants" class="view-section">
             <div class="card">
                 <h2>👥 Carnet de Militants</h2>
+                
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 100px;">
-                    <input type="text" id="m-lastname" placeholder="Nom" style="margin-bottom:10px; flex: 1; min-width: 100px;">
-                    <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 120px;">
+                    <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="text" id="m-lastname" placeholder="Nom" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="text" id="m-company" placeholder="Entreprise / Tag (ex: LFI)" style="margin-bottom:10px; flex: 1; min-width: 100px;">
+                    <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 110px;">
                 </div>
                 <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
+                
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
-                    <label>Importer un CSV (Prénom, Nom, Numéro) :</label>
+                    <label>Importer un CSV Google Contacts (Prénom, Nom, Entreprise, Téléphone) :</label>
                     <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
                 </div>
+
+                <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
+                    <label>Filtrer les militants :</label>
+                    <input type="text" id="militant-search" placeholder="Rechercher par nom ou tag (ex: LFI)..." oninput="renderMilitants()" style="margin-bottom:0;">
+                </div>
+
                 <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
             </div>
         </div>
@@ -381,16 +388,11 @@
         db.ref('templates').on('value', (snap) => { 
             if(snap.val()) { 
                 let data = snap.val();
-                // Nettoyage si Firebase a renvoyé un tableau corrompu
                 if(Array.isArray(data)) {
                     let fixed = {};
-                    data.forEach((item, idx) => {
-                        if(item) fixed["cat_" + idx] = item;
-                    });
+                    data.forEach((item, idx) => { if(item) fixed["cat_" + idx] = item; });
                     templates = fixed;
-                } else {
-                    templates = data;
-                }
+                } else { templates = data; }
                 renderTemplates(); 
             } 
         });
@@ -418,6 +420,7 @@
             if(viewName === 'stats') renderDetailedStats();
             if(viewName === 'campaigns') renderCampaigns();
             if(viewName === 'templates') renderTemplates();
+            if(viewName === 'militants') renderMilitants();
         }
 
         function switchCalendarTab(tab) {
@@ -442,15 +445,12 @@
             renderDetailedStats();
         }
 
-        // --- GESTION DES CATEGORIES PAR LIBELLE ROBUSTE ---
         function addNewCategory() {
             const label = document.getElementById('new-cat-label').value.trim();
             if(!label) { alert("Saisis un libellé !"); return; }
             const key = 'cat_' + Date.now();
-
             if(!templates || Array.isArray(templates)) templates = {};
             templates[key] = { label: label, list: [] };
-            
             saveData();
             document.getElementById('new-cat-label').value = '';
             renderTemplates();
@@ -471,12 +471,10 @@
             for (let cat in templates) {
                 let catData = templates[cat];
                 if(!catData) continue;
-                
                 let catLabel = catData.label || cat;
                 let catList = catData.list || [];
 
                 select.innerHTML += `<option value="${cat}">${catLabel}</option>`;
-                
                 container.innerHTML += `<div style="font-weight:bold; margin-top:12px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between;"><span>${catLabel}</span> <button class="delete-btn" onclick="deleteCategory('${cat}')" style="font-size:0.75rem;">Supprimer</button></div>`;
                 
                 if(Array.isArray(catList) && catList.length > 0) {
@@ -491,17 +489,13 @@
                             </div>`;
                     });
                 } else {
-                    container.innerHTML += `<div style="font-size:0.75rem; color:var(--gray); font-style:italic; margin-bottom:5px;">Aucun message dans cette catégorie.</div>`;
+                    container.innerHTML += `<div style="font-size:0.75rem; color:var(--gray); font-style:italic; margin-bottom:5px;">Aucun message.</div>`;
                 }
             }
         }
 
         function deleteCategory(cat) {
-            if(confirm("Supprimer cette catégorie ?")) { 
-                delete templates[cat]; 
-                saveData(); 
-                renderTemplates(); 
-            }
+            if(confirm("Supprimer cette catégorie ?")) { delete templates[cat]; saveData(); renderTemplates(); }
         }
 
         function addTemplate() {
@@ -512,8 +506,7 @@
                 if(!templates[cat].list) templates[cat].list = [];
                 templates[cat].list.push(input.value.trim());
                 input.value = '';
-                saveData();
-                renderTemplates();
+                saveData(); renderTemplates();
             }
         }
 
@@ -524,8 +517,7 @@
             if (newText !== null && newText.trim() !== "") {
                 if(templates[cat] && templates[cat].list) {
                     templates[cat].list[index] = newText.trim();
-                    saveData(); 
-                    renderTemplates();
+                    saveData(); renderTemplates();
                 }
             }
         }
@@ -533,12 +525,10 @@
         function deleteTemplate(cat, index) {
             if(templates[cat] && templates[cat].list) {
                 templates[cat].list.splice(index, 1);
-                saveData(); 
-                renderTemplates();
+                saveData(); renderTemplates();
             }
         }
 
-        // --- AGENDA ---
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
             if(!container) return;
@@ -597,7 +587,7 @@
                     rawDate: rawDateStr,
                     location: actionLocation,
                     timestamp: timestamp || new Date().getTime(),
-                    queue: militants.map(m => ({ name: m.name, lastname: m.lastname || "", phone: m.phone, message: "", status: 'À contacter', sentAt: null, lastSentTimestamp: null }))
+                    queue: militants.map(m => ({ name: m.name, lastname: m.lastname || "", company: m.company || "", phone: m.phone, message: "", status: 'À contacter', sentAt: null, lastSentTimestamp: null }))
                 };
                 saveData();
             }
@@ -616,7 +606,6 @@
             }
         }
 
-        // --- CAMPAGNES ---
         function renderCampaigns() {
             const container = document.getElementById('campaigns-container');
             if(!container) return;
@@ -632,7 +621,6 @@
 
             for (let eventId in campaigns) {
                 let camp = campaigns[eventId];
-                
                 let isPast = false;
                 if(camp.timestamp && camp.timestamp < now) isPast = true;
                 else if(camp.rawDate) {
@@ -661,6 +649,7 @@
                     let realIndex = camp.queue.indexOf(item);
                     let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info'));
                     const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+                    const compTag = item.company ? ` [${item.company}]` : '';
 
                     let templateOptions = '';
                     for (let cat in templates) {
@@ -671,7 +660,7 @@
                     queueHtml += `
                         <div class="sms-item">
                             <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <strong>${fullName} (${item.phone})</strong>
+                                <strong>${fullName}${compTag} (${item.phone})</strong>
                                 <span class="tag ${badgeClass}">${item.status}</span>
                             </div>
                             <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
@@ -751,7 +740,6 @@
         function setStatus(eventId, index, status) { campaigns[eventId].queue[index].status = status; saveData(); renderCampaigns(); }
         function deleteCampaign(eventId) { if(confirm("Supprimer cette campagne ?")) { delete campaigns[eventId]; saveData(); renderCampaigns(); } }
 
-        // --- STATISTIQUES ---
         function renderDetailedStats() {
             const selectAction = document.getElementById('stat-filter-action');
             const globalContainer = document.getElementById('global-stats-container');
@@ -801,31 +789,70 @@
             detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
         }
 
-        // --- MILITANTS ---
+        // --- MILITANTS & RECHERCHE/TRI ---
         function addMilitant() {
             const name = document.getElementById('m-name').value.trim();
             const lastname = document.getElementById('m-lastname').value.trim();
+            const company = document.getElementById('m-company').value.trim();
             const phone = document.getElementById('m-phone').value.trim();
-            if(name && phone) { militants.push({ name, lastname, phone }); document.getElementById('m-name').value=''; document.getElementById('m-lastname').value=''; document.getElementById('m-phone').value=''; saveData(); renderMilitants(); }
-            else alert("Prénom et numéro obligatoires !");
+            if(name && phone) { 
+                militants.push({ name, lastname, company, phone }); 
+                document.getElementById('m-name').value=''; 
+                document.getElementById('m-lastname').value=''; 
+                document.getElementById('m-company').value=''; 
+                document.getElementById('m-phone').value=''; 
+                saveData(); renderMilitants(); 
+            } else { alert("Prénom et numéro obligatoires !"); }
         }
+
         function renderMilitants() {
-            const mContainer = document.getElementById('militants-ul'); if(!mContainer) return;
+            const mContainer = document.getElementById('militants-ul'); 
+            const searchInput = document.getElementById('militant-search');
+            if(!mContainer) return;
+
+            let filter = searchInput ? searchInput.value.toLowerCase() : '';
             mContainer.innerHTML = '';
-            militants.forEach((m, index) => {
-                mContainer.innerHTML += `<li class="list-group-item"><span><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong> (${m.phone})</span><button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button></li>`;
+
+            let filtered = militants.filter(m => {
+                let fullName = `${m.name} ${m.lastname || ''} ${m.company || ''} ${m.phone}`.toLowerCase();
+                return fullName.includes(filter);
             });
+
+            filtered.forEach((m) => {
+                let realIndex = militants.indexOf(m);
+                let compBadge = m.company ? ` <span class="tag bg-info" style="font-size:0.65rem;">${m.company}</span>` : '';
+                mContainer.innerHTML += `
+                    <li class="list-group-item">
+                        <span><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge} (${m.phone})</span>
+                        <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
+                    </li>`;
+            });
+            if(filtered.length === 0) {
+                mContainer.innerHTML = '<li style="padding:10px; font-size:0.85rem; color:var(--gray); text-align:center;">Aucun militant trouvé.</li>';
+            }
         }
+
         function deleteMilitant(index) { militants.splice(index, 1); saveData(); renderMilitants(); }
+
         function importCSV(e) {
             const file = e.target.files[0]; if (!file) return;
             const reader = new FileReader();
             reader.onload = function(evt) {
-                evt.target.result.split('\n').forEach(line => {
-                    const cols = line.split(',');
-                    if(cols.length >= 2) militants.push({ name: cols[0].trim(), lastname: cols[1]?.trim() || "", phone: cols[cols.length-1].trim() });
+                let lines = evt.target.result.split('\n');
+                lines.forEach(line => {
+                    let cols = line.split(',');
+                    if(cols.length >= 2) {
+                        // Support CSV Google Contacts (Prénom, Nom, Organisation/Entreprise, Téléphone ou similaire)
+                        let name = cols[0]?.trim() || "";
+                        let lastname = cols[1]?.trim() || "";
+                        let company = cols[2]?.trim() || "";
+                        let phone = cols[cols.length - 1]?.trim() || "";
+                        if(name && phone && !name.toLowerCase().includes('name')) {
+                            militants.push({ name, lastname, company, phone });
+                        }
+                    }
                 });
-                saveData(); renderMilitants(); alert("Import réussi !");
+                saveData(); renderMilitants(); alert("Import Google Contacts / CSV réussi !");
             };
             reader.readAsText(file);
         }
