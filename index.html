@@ -5,9 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SMS Militants - Coordination & Statistiques</title>
     
-    <!-- Favicon et Icônes tactiles -->
+    <!-- Favicon et Icônes tactiles renforcées pour mobile -->
     <link rel="icon" type="image/png" href="app-icon.png">
     <link rel="apple-touch-icon" href="app-icon.png">
+    <link rel="apple-touch-icon-precomposed" href="app-icon.png">
+    <meta name="msapplication-TileImage" content="app-icon.png">
     
     <!-- Manifeste PWA -->
     <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
@@ -22,6 +24,7 @@
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
     <style>
         :root {
             --primary: #e53935;
@@ -288,10 +291,25 @@
 </head>
 <body>
 
+    <!-- ÉCRAN DE CONNEXION GOOGLE -->
+    <div id="login-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:9999; display:flex; justify-content:center; align-items:center;">
+        <div class="card" style="text-align:center; max-width:400px; width:90%; padding:30px;">
+            <img src="app-icon.png" alt="Logo" style="width:80px; height:80px; border-radius:16px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <h2 style="color:var(--primary-dark); margin-bottom:10px;">SMS Militants</h2>
+            <p style="font-size:0.9rem; color:var(--gray); margin-bottom:25px;">Connectez-vous avec votre compte Google autorisé pour accéder à l'application.</p>
+            <button onclick="loginWithGoogle()" style="background:#4285F4; display:flex; align-items:center; justify-content:center; gap:10px; padding:12px; font-size:1rem;">
+                <span style="background:white; color:#4285F4; padding:4px 8px; border-radius:4px; font-weight:bold;">G</span> Se connecter avec Google
+            </button>
+        </div>
+    </div>
+
     <header>
         <button class="burger-btn" onclick="toggleDrawer()">☰</button>
         <h1>SMS Militants 📢</h1>
-        <p>Coordination & Statistiques</p>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <p style="margin:0;">Coordination & Statistiques</p>
+            <button onclick="logout()" style="background:transparent; border:1px solid rgba(255,255,255,0.4); padding:4px 8px; font-size:0.75rem; width:auto; border-radius:4px;" title="Se déconnecter">Déconnexion</button>
+        </div>
     </header>
 
     <div id="drawer-overlay" class="drawer-overlay" onclick="toggleDrawer()"></div>
@@ -479,6 +497,29 @@
 
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+        const auth = firebase.auth();
+
+        // Gestion de l'authentification Google
+        auth.onAuthStateChanged((user) => {
+            const loginOverlay = document.getElementById('login-overlay');
+            if (user) {
+                loginOverlay.style.display = 'none';
+                initAppData();
+            } else {
+                loginOverlay.style.display = 'flex';
+            }
+        });
+
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch((error) => {
+                alert("Erreur de connexion : " + error.message);
+            });
+        }
+
+        function logout() {
+            auth.signOut();
+        }
 
         let templates = {
             first: { label: "1er message", list: ["Salut {prenom}, dispo pour {action} le {date} ? Rdv {lieu}"] },
@@ -504,26 +545,28 @@
         let modalTargetEventId = null;
         let modalCachedEventData = null;
 
-        db.ref('templates').on('value', (snap) => { 
-            if(snap.val()) { 
-                let data = snap.val();
-                if(Array.isArray(data)) {
-                    let fixed = {};
-                    data.forEach((item, idx) => { if(item) fixed["cat_" + idx] = item; });
-                    templates = fixed;
-                } else { templates = data; }
-                renderTemplates(); 
-            } 
-        });
-        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); sortMilitants(); renderUI(); } });
-        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
-        db.ref('calendarEvents').on('value', (snap) => { 
-            if(snap.val()) { 
-                let rawEvents = snap.val();
-                calendarEvents = rawEvents.map(ev => ({ ...ev }));
-                renderCalendarEvents(); 
-            } 
-        });
+        function initAppData() {
+            db.ref('templates').on('value', (snap) => { 
+                if(snap.val()) { 
+                    let data = snap.val();
+                    if(Array.isArray(data)) {
+                        let fixed = {};
+                        data.forEach((item, idx) => { if(item) fixed["cat_" + idx] = item; });
+                        templates = fixed;
+                    } else { templates = data; }
+                    renderTemplates(); 
+                } 
+            });
+            db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); sortMilitants(); renderUI(); } });
+            db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
+            db.ref('calendarEvents').on('value', (snap) => { 
+                if(snap.val()) { 
+                    let rawEvents = snap.val();
+                    calendarEvents = rawEvents.map(ev => ({ ...ev }));
+                    renderCalendarEvents(); 
+                } 
+            });
+        }
 
         function saveData() {
             db.ref('templates').set(templates);
@@ -866,7 +909,8 @@
                         message: "",
                         status: 'À contacter',
                         sentAt: null,
-                        lastSentTimestamp: null
+                        lastSentTimestamp: null,
+                        history: [] // Historique des SMS envoyés
                     });
                 }
             });
@@ -968,6 +1012,25 @@
                 const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
                 const cityStr = item.city ? ` (${item.city})` : '';
 
+                // Construction de l'historique des SMS pour ce militant
+                let historyList = item.history || [];
+                if(item.sentAt && historyList.length === 0) {
+                    // Rétrocompatibilité avec les anciens envois
+                    historyList.push({ date: item.sentAt, message: item.message || "" });
+                }
+                let historyHtml = '';
+                if(historyList.length > 0) {
+                    historyHtml = `<div style="margin-top:6px; background:#edf2f7; padding:6px; border-radius:4px; font-size:0.75rem;">
+                        <strong>📜 Historique des envois (${historyList.length}) :</strong>
+                        <ul style="margin:2px 0 0 15px; padding:0;">`;
+                    historyList.forEach(h => {
+                        historyHtml += `<li><em>${h.date}</em> : "${h.message}"</li>`;
+                    });
+                    historyHtml += `</ul></div>`;
+                } else {
+                    historyHtml = `<div style="margin-top:6px; font-size:0.75rem; color:var(--gray);">🕒 Aucun SMS envoyé pour le moment.</div>`;
+                }
+
                 let templateOptions = '';
                 for (let cat in templates) {
                     let cLabel = templates[cat]?.label || cat;
@@ -988,8 +1051,8 @@
                             <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
                             <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
                         </div>
-                        <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
-                        <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
+                        ${historyHtml}
+                        <div class="actions-flex" style="margin-top:8px;"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
                         <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
                             <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
                             <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
@@ -1094,6 +1157,23 @@
                         const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
                         const cityStr = item.city ? ` (${item.city})` : '';
 
+                        let historyList = item.history || [];
+                        if(item.sentAt && historyList.length === 0) {
+                            historyList.push({ date: item.sentAt, message: item.message || "" });
+                        }
+                        let historyHtml = '';
+                        if(historyList.length > 0) {
+                            historyHtml = `<div style="margin-top:6px; background:#edf2f7; padding:6px; border-radius:4px; font-size:0.75rem;">
+                                <strong>📜 Historique des envois (${historyList.length}) :</strong>
+                                <ul style="margin:2px 0 0 15px; padding:0;">`;
+                            historyList.forEach(h => {
+                                historyHtml += `<li><em>${h.date}</em> : "${h.message}"</li>`;
+                            });
+                            historyHtml += `</ul></div>`;
+                        } else {
+                            historyHtml = `<div style="margin-top:6px; font-size:0.75rem; color:var(--gray);">🕒 Aucun SMS envoyé pour le moment.</div>`;
+                        }
+
                         let templateOptions = '';
                         for (let cat in templates) {
                             let cLabel = templates[cat]?.label || cat;
@@ -1114,8 +1194,8 @@
                                     <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
                                     <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
                                 </div>
-                                <div style="font-size:0.75rem; color:var(--gray);">🕒 ${item.sentAt ? 'Envoyé le : ' + item.sentAt : 'Jamais contacté'}</div>
-                                <div class="actions-flex"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
+                                ${historyHtml}
+                                <div class="actions-flex" style="margin-top:8px;"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
                                 <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
                                     <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
@@ -1211,9 +1291,15 @@
 
         function markAsSent(eventId, index) {
             const now = new Date();
-            campaigns[eventId].queue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
-            campaigns[eventId].queue[index].lastSentTimestamp = now.getTime();
-            if(campaigns[eventId].queue[index].status === 'À contacter') campaigns[eventId].queue[index].status = 'En attente de réponse';
+            const dateStr = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+            const item = campaigns[eventId].queue[index];
+
+            item.sentAt = dateStr;
+            item.lastSentTimestamp = now.getTime();
+            if(!item.history) item.history = [];
+            item.history.push({ date: dateStr, message: item.message || "" });
+
+            if(item.status === 'À contacter') item.status = 'En attente de réponse';
             saveData();
         }
 
@@ -1282,7 +1368,8 @@
                             if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
                             let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let historyCount = (item.history || []).length || (item.sentAt ? 1 : 0);
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${historyCount} SMS (dernier : ${item.sentAt || 'Jamais'})</td></tr>`;
                         });
                     }
 
@@ -1299,7 +1386,7 @@
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${cWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
-                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Historique SMS</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
                     </div>`;
                 });
 
@@ -1346,7 +1433,8 @@
                             if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
                             let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
+                            let historyCount = (item.history || []).length || (item.sentAt ? 1 : 0);
+                            rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${st}</span></td><td style="padding: 6px; color:var(--gray);">${historyCount} SMS (dernier : ${item.sentAt || 'Jamais'})</td></tr>`;
                         });
                     }
 
@@ -1363,7 +1451,7 @@
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${cWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
-                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Historique SMS</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
                     </div>`;
                 }
 
@@ -1404,6 +1492,7 @@
                     let mPhoneClean = cleanPhone(m.phone);
                     let historyRows = '';
                     let mYes = 0, mMaybe = 0, mNo = 0, mWaiting = 0, mContact = 0, mParticipations = 0;
+                    let totalSmsSentForMilitant = 0;
 
                     Object.values(campaigns).forEach(camp => {
                         if (!isCampInPeriod(camp)) return;
@@ -1414,6 +1503,9 @@
                                     if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
 
                                     mParticipations++;
+                                    let smsCount = (item.history || []).length || (item.sentAt ? 1 : 0);
+                                    totalSmsSentForMilitant += smsCount;
+
                                     if (st === 'Participe') mYes++;
                                     else if (st === 'Peut-être') mMaybe++;
                                     else if (st === 'Refus') mNo++;
@@ -1421,10 +1513,24 @@
                                     else if (st === 'À contacter') mContact++;
 
                                     let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+                                    
+                                    // Affichage détaillé de l'historique dans le profil
+                                    let historyDetails = "";
+                                    let hList = item.history || [];
+                                    if(hList.length > 0) {
+                                        historyDetails = `<ul style="margin:4px 0 0 15px; padding:0; font-size:0.75rem; color:var(--gray);">`;
+                                        hList.forEach(h => {
+                                            historyDetails += `<li><em>${h.date}</em> : "${h.message}"</li>`;
+                                        });
+                                        historyDetails += `</ul>`;
+                                    } else if(item.sentAt) {
+                                        historyDetails = `<br><span style="font-size:0.75rem; color:var(--gray);">Envoyé le : ${item.sentAt}</span>`;
+                                    }
+
                                     historyRows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;">
                                         <td style="padding:6px;"><strong>${camp.originalName || camp.name}</strong><br><span style="color:var(--gray); font-size:0.75rem;">${camp.date}</span></td>
                                         <td style="padding:6px;"><span class="tag ${badgeClass}">${st}</span></td>
-                                        <td style="padding:6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td>
+                                        <td style="padding:6px;"><strong>${smsCount} SMS</strong>${historyDetails}</td>
                                     </tr>`;
                                 }
                             });
@@ -1440,14 +1546,15 @@
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">👤 ${mDisplayName}${compBadge}${cityStr} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${m.phone})</span></h3>
                         <div style="margin-bottom:8px;">
-                            <span class="stats-badge">📌 Total Actions : ${mParticipations}</span>
+                            <span class="stats-badge">📌 Actions : ${mParticipations}</span>
+                            <span class="stats-badge" style="background:#ebf8ff; color:#2b6cb0;">📤 Total SMS envoyés : ${totalSmsSentForMilitant}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${mYes}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${mMaybe}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${mNo}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ En attente : ${mWaiting}</span>
                             <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${mContact}</span>
                         </div>
-                        ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce filtre.</p>'}
+                        ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Historique & Détails SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce filtre.</p>'}
                     </div>`;
                 });
 
@@ -1478,7 +1585,7 @@
             }
             
             if (currentStatTab === 'date' || currentStatTab === 'action') {
-                csvContent += "Action,DateAction,Lieu,NomMilitant,Telephone,StatutMilitant,DateContactSMS\r\n";
+                csvContent += "Action,DateAction,Lieu,NomMilitant,Telephone,StatutMilitant,NombreSMS,DernierContactSMS\r\n";
                 Object.values(campaigns).forEach(camp => {
                     if (!isCampInPeriod(camp)) return;
                     if (camp.queue) {
@@ -1486,6 +1593,7 @@
                             let st = item.status;
                             if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
                             let fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+                            let smsCount = (item.history || []).length || (item.sentAt ? 1 : 0);
                             let row = [
                                 `"${(camp.originalName || camp.name).replace(/"/g, '""')}"`,
                                 `"${camp.date}"`,
@@ -1493,6 +1601,7 @@
                                 `"${fullName.replace(/"/g, '""')}"`,
                                 `"${item.phone}"`,
                                 `"${st}"`,
+                                `${smsCount}`,
                                 `"${item.sentAt || 'Jamais'}"`
                             ];
                             csvContent += row.join(",") + "\r\n";
@@ -1500,7 +1609,7 @@
                     }
                 });
             } else if (currentStatTab === 'militant') {
-                csvContent += "NomMilitant,Entreprise,Ville,Telephone,Action,DateAction,StatutMilitant,DateContactSMS\r\n";
+                csvContent += "NomMilitant,Entreprise,Ville,Telephone,Action,DateAction,StatutMilitant,NombreSMS,DernierContactSMS\r\n";
                 let sortedMilitantsForCSV = [...militants].sort((a, b) => {
                     let nameA = (a.name || "").toLowerCase();
                     let nameB = (b.name || "").toLowerCase();
@@ -1521,6 +1630,7 @@
                                     let st = item.status;
                                     if (globalStatStatusFilter !== 'all' && st !== globalStatStatusFilter) return;
                                     foundAny = true;
+                                    let smsCount = (item.history || []).length || (item.sentAt ? 1 : 0);
                                     let row = [
                                         `"${mName.replace(/"/g, '""')}"`,
                                         `"${(m.company || '').replace(/"/g, '""')}"`,
@@ -1529,6 +1639,7 @@
                                         `"${(camp.originalName || camp.name).replace(/"/g, '""')}"`,
                                         `"${camp.date}"`,
                                         `"${st}"`,
+                                        `${smsCount}`,
                                         `"${item.sentAt || 'Jamais'}"`
                                     ];
                                     csvContent += row.join(",") + "\r\n";
@@ -1546,6 +1657,7 @@
                             `"Aucune"`,
                             `"Aucune"`,
                             `"N/A"`,
+                            `0`,
                             `"N/A"`
                         ];
                         csvContent += row.join(",") + "\r\n";
@@ -1766,8 +1878,6 @@
             };
             reader.readAsText(file);
         }
-
-        renderUI();
     </script>
 </body>
 </html>
