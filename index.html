@@ -360,7 +360,7 @@
                 <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
                 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
-                    <label>Importer un CSV / Google Contacts (Sans téléphone = rejeté) :</label>
+                    <label>Importer un CSV / Google Contacts :</label>
                     <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
                 </div>
 
@@ -419,7 +419,7 @@
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
 
-        let modalTargetEventId = null; // null = init campagne, sinon = ajout en cours de campagne
+        let modalTargetEventId = null;
 
         db.ref('templates').on('value', (snap) => { 
             if(snap.val()) { 
@@ -442,7 +442,6 @@
             db.ref('campaigns').set(campaigns);
         }
 
-        // Tri automatique : Entreprise puis Ordre alphabétique prénom/nom
         function sortMilitants() {
             militants.sort((a, b) => {
                 let compA = (a.company || "").toLowerCase();
@@ -627,7 +626,6 @@
             container.innerHTML = html;
         }
 
-        // --- GESTION DE LA MODALE DE SELECTION ---
         let modalCachedEventData = null;
 
         function openMilitantModalForEvent(eventId, actionName, actionDate, rawDateStr, actionLocation, timestamp) {
@@ -662,7 +660,6 @@
 
             let filter = searchInput ? searchInput.value.toLowerCase() : '';
 
-            // Extraire toutes les entreprises uniques pour les boutons de filtre rapide
             let companies = [...new Set(militants.map(m => m.company).filter(Boolean))];
             let filtersHtml = `<button onclick="filterByCompanyModal('')" class="tag bg-gray" style="border:none; cursor:pointer;">Tous</button>`;
             companies.forEach(c => {
@@ -731,7 +728,6 @@
             }
 
             if(!campaigns[modalTargetEventId]) {
-                // Création initiale de la campagne
                 campaigns[modalTargetEventId] = {
                     name: modalCachedEventData.name,
                     date: modalCachedEventData.date,
@@ -741,7 +737,6 @@
                     queue: selectedMilitants
                 };
             } else {
-                // Ajout à une campagne existante en évitant les doublons de numéro
                 let currentPhones = campaigns[modalTargetEventId].queue.map(q => cleanPhone(q.phone));
                 selectedMilitants.forEach(sm => {
                     if(!currentPhones.includes(cleanPhone(sm.phone))) {
@@ -965,10 +960,18 @@
             detailedContainer.innerHTML = actionDetailsHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
         }
 
-        // --- MILITANTS & TRI ---
+        // --- MILITANTS, NORMALISATION DES NUMÉROS & TRI ---
         function cleanPhone(phone) {
             if(!phone) return "";
-            return phone.replace(/[^0-9+]/g, '');
+            // Enlever tout sauf chiffres et +
+            let cleaned = phone.replace(/[^0-9+]/g, '');
+            // Convertir le format international +33 en national 0
+            if(cleaned.startsWith('+33')) {
+                cleaned = '0' + cleaned.slice(3);
+            } else if(cleaned.startsWith('33') && cleaned.length === 11) {
+                cleaned = '0' + cleaned.slice(2);
+            }
+            return cleaned;
         }
 
         function addMilitant() {
@@ -982,7 +985,7 @@
 
             let exists = militants.some(m => cleanPhone(m.phone) === phone);
             if(exists) {
-                alert("⚠️️ Ce numéro de téléphone existe déjà dans le carnet !");
+                alert("⚠️ Ce numéro de téléphone existe déjà dans le carnet !");
                 return;
             }
 
@@ -1046,29 +1049,33 @@
                     
                     let cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"\vert{}"$/g, '').trim());
                     
-                    if(cols.length >= 2) {
+                    if(cols.length >= 1) {
                         let name = "", lastname = "", company = "", city = "", phone = "";
 
                         if(cols.length > 30) {
                             name = cols[1] || "";
                             lastname = cols[3] || "";
                             company = cols[31] || "";
-                            for(let i = 35; i < cols.length; i++) {
-                                if(cols[i] && /^[0-9+() \-\.]+$/.test(cols[i]) && cols[i].length > 5) {
-                                    phone = cleanPhone(cols[i]);
-                                    break;
-                                }
-                            }
                         } else {
                             name = cols[0] || "";
                             lastname = cols[1] || "";
                             company = cols[2] || "";
                             city = cols[3] || "";
-                            phone = cleanPhone(cols[cols.length - 1] || "");
                         }
 
-                        // STRICT : Si pas de téléphone, on rejette
-                        if(!phone || phone.length < 5 || phone.includes('http')) {
+                        // Recherche intelligente d'un numéro dans TOUTES les colonnes si non trouvé
+                        for(let i = 0; i < cols.length; i++) {
+                            let val = cols[i];
+                            if(val && (/^[0-9+() \-\.]+$/.test(val)) && val.replace(/[^0-9]/g, '').length >= 9) {
+                                let cleanedCandidate = cleanPhone(val);
+                                if(cleanedCandidate.length >= 9 && !cleanedCandidate.includes('http')) {
+                                    phone = cleanedCandidate;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if(!phone || phone.length < 9) {
                             if(name) noPhoneCount++;
                             return;
                         }
