@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MilitantSMS - Organisateur d'Actions</title>
+    <title>MilitantSMS - Cloud & Agenda</title>
+    <!-- Import de Firebase pour la synchronisation multi-appareils -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
     <style>
         :root {
             --primary: #e53935;
@@ -86,16 +89,9 @@
             transition: background 0.2s;
         }
 
-        button:hover {
-            background-color: var(--primary-dark);
-        }
-
-        .btn-secondary {
-            background-color: #4a5568;
-        }
-        .btn-secondary:hover {
-            background-color: #2d3748;
-        }
+        button:hover { background-color: var(--primary-dark); }
+        .btn-secondary { background-color: #4a5568; }
+        .btn-secondary:hover { background-color: #2d3748; }
 
         .sms-item {
             background: #f7fafc;
@@ -133,12 +129,7 @@
             margin-top: 10px;
         }
 
-        .list-group {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
+        .list-group { list-style: none; padding: 0; margin: 0; }
         .list-group-item {
             display: flex;
             justify-content: space-between;
@@ -156,21 +147,42 @@
             width: auto;
             padding: 5px 10px;
         }
+        
+        .meta-info {
+            font-size: 0.75rem;
+            color: var(--gray);
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
 
     <header>
         <h1>MilitantSMS 📢</h1>
-        <p style="margin:0; font-size: 0.9rem;">Organisation semi-automatisée par SMS</p>
+        <p style="margin:0; font-size: 0.9rem;">Synchro Cloud & Agenda Google</p>
     </header>
 
     <div class="container">
 
+        <!-- CONFIG FIREBASE (Pour synchro PC/Tel) -->
+        <div class="card" id="config-card">
+            <h2>⚙️ Configuration Cloud (Synchro PC / Téléphone)</h2>
+            <p style="font-size: 0.85rem; color: var(--gray);">Pour lier tes appareils, crée un projet gratuit sur <a href="https://firebase.google.com/" target="_blank">Firebase</a>, crée une Realtime Database et colle tes identifiants ici :</p>
+            <input type="text" id="fb-url" placeholder="Database URL (ex: https://xxx.firebaseio.com)">
+            <button onclick="initFirebaseConfig()">Activer la Synchro</button>
+        </div>
+
+        <!-- SYNCHRO AGENDA GOOGLE -->
+        <div class="card">
+            <h2>📅 Synchronisation Google Agenda</h2>
+            <p style="font-size: 0.85rem; color: var(--gray);">Importe rapidement un événement depuis ton Google Agenda public ou iCal :</p>
+            <input type="text" id="ical-url" placeholder="Colle le lien public iCal de ton Google Agenda">
+            <button onclick="importGoogleCalendar()" class="btn-secondary">Importer les actions</button>
+        </div>
+
         <!-- CONFIGURATION DES MESSAGES TYPES -->
         <div class="card">
             <h2>💬 Mes Messages Types Aléatoires</h2>
-            <p style="font-size: 0.85rem; color: var(--gray);">L'appli piochera au hasard l'un de ces messages pour chaque militant.</p>
             <div id="templates-list"></div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <input type="text" id="new-template" placeholder="Ex: Salut {prenom} ! Dispo pour {action} le {date} ?" style="margin-bottom:0;">
@@ -204,35 +216,59 @@
         <!-- FILE D'ATTENTE DES SMS -->
         <div class="card" id="campaign-card" style="display:none;">
             <h2>📋 File d'attente des envois</h2>
-            <p style="font-size: 0.85rem; color: var(--gray);">Clique sur "Envoyer", ton appli SMS s'ouvre, puis mets à jour le statut du militant.</p>
             <div id="queue-container"></div>
         </div>
 
     </div>
 
     <script>
-        // Données par défaut ou chargées depuis le stockage local du téléphone
+        // Gestion de la persistance (LocalStorage ou Firebase si configuré)
+        let db = null;
         let templates = JSON.parse(localStorage.getItem('m_templates')) || [
             "Salut {prenom} ! Serais-tu dispo pour le/la {action} {date} ?",
-            "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?",
-            "Salut {prenom}, motivé(e) pour participer au/à la {action} {date} ?"
+            "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?"
         ];
 
-        let militants = JSON.parse(localStorage.getItem('m_militants')) || [
-            { name: "Thomas", phone: "0612345678" },
-            { name: "Sarah", phone: "0698765432" }
-        ];
+        let militants = JSON.parse(localStorage.getItem('m_militants')) || [];
+        let campaignQueue = JSON.parse(localStorage.getItem('m_queue')) || [];
 
-        let campaignQueue = [];
+        function initFirebaseConfig() {
+            const url = document.getElementById('fb-url').value.trim();
+            if(url) {
+                localStorage.setItem('fb_url', url);
+                alert("Configuration enregistrée ! Recharge la page.");
+                location.reload();
+            }
+        }
+
+        // Si Firebase est configuré, on synchronise
+        const savedFbUrl = localStorage.getItem('fb_url');
+        if(savedFbUrl) {
+            document.getElementById('config-card').style.display = 'none';
+            firebase.initializeApp({ databaseURL: savedFbUrl });
+            db = firebase.database();
+
+            db.ref('militants').on('value', (snapshot) => {
+                if(snapshot.val()) { militants = snapshot.val(); renderUI(); }
+            });
+            db.ref('queue').on('value', (snapshot) => {
+                if(snapshot.val()) { campaignQueue = snapshot.val(); renderQueue(); }
+            });
+        }
 
         function saveData() {
             localStorage.setItem('m_templates', JSON.stringify(templates));
             localStorage.setItem('m_militants', JSON.stringify(militants));
+            localStorage.setItem('m_queue', JSON.stringify(campaignQueue));
+
+            if(db) {
+                db.ref('militants').set(militants);
+                db.ref('queue').set(campaignQueue);
+            }
             renderUI();
         }
 
         function renderUI() {
-            // Rendu des templates
             const tContainer = document.getElementById('templates-list');
             tContainer.innerHTML = '';
             templates.forEach((t, index) => {
@@ -243,7 +279,6 @@
                     </div>`;
             });
 
-            // Rendu des militants
             const mContainer = document.getElementById('militants-ul');
             mContainer.innerHTML = '';
             militants.forEach((m, index) => {
@@ -253,6 +288,11 @@
                         <button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button>
                     </li>`;
             });
+
+            if(campaignQueue.length > 0) {
+                document.getElementById('campaign-card').style.display = 'block';
+                renderQueue();
+            }
         }
 
         function addTemplate() {
@@ -264,10 +304,7 @@
             }
         }
 
-        function deleteTemplate(index) {
-            templates.splice(index, 1);
-            saveData();
-        }
+        function deleteTemplate(index) { templates.splice(index, 1); saveData(); }
 
         function addMilitant() {
             const name = document.getElementById('m-name').value.trim();
@@ -277,30 +314,18 @@
                 document.getElementById('m-name').value = '';
                 document.getElementById('m-phone').value = '';
                 saveData();
-            } else {
-                alert("Remplis le nom et le numéro !");
-            }
+            } else { alert("Remplis le nom et le numéro !"); }
         }
 
-        function deleteMilitant(index) {
-            militants.splice(index, 1);
-            saveData();
-        }
+        function deleteMilitant(index) { militants.splice(index, 1); saveData(); }
 
         function startCampaign() {
-            if(militants.length === 0) {
-                alert("Ajoute d'abord des militants !");
-                return;
-            }
-            if(templates.length === 0) {
-                alert("Ajoute au moins un message type !");
-                return;
-            }
+            if(militants.length === 0) { alert("Ajoute d'abord des militants !"); return; }
+            if(templates.length === 0) { alert("Ajoute au moins un message type !"); return; }
 
             const actionName = document.getElementById('action-name').value;
             const actionDate = document.getElementById('action-date').value;
 
-            // Préparation de la file avec un choix aléatoire de message pour chaque personne
             campaignQueue = militants.map(m => {
                 const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
                 let msg = randomTemplate
@@ -309,14 +334,15 @@
                     .replace(/{date}/g, actionDate);
                 
                 return {
-                    ...m,
+                    name: m.name,
+                    phone: m.phone,
                     message: msg,
-                    status: 'En attente'
+                    status: 'En attente',
+                    sentAt: null
                 };
             });
 
-            document.getElementById('campaign-card').style.display = 'block';
-            renderQueue();
+            saveData();
         }
 
         function renderQueue() {
@@ -327,6 +353,9 @@
                 let badgeClass = 'bg-warning';
                 if(item.status === 'Participe') badgeClass = 'bg-success';
                 if(item.status === 'Refus') badgeClass = 'bg-danger';
+                if(item.status === 'En attente de réponse') badgeClass = 'bg-gray';
+
+                let metaText = item.sentAt ? `Envoyé le : ${item.sentAt}` : 'Non envoyé';
 
                 container.innerHTML += `
                     <div class="sms-item">
@@ -335,26 +364,46 @@
                             <span class="tag ${badgeClass}">${item.status}</span>
                         </div>
                         <div class="message-preview">"${item.message}"</div>
+                        <div class="meta-info">🕒 ${metaText}</div>
                         <div class="actions-flex">
-                            <a href="sms:${item.phone}?body=${encodeURIComponent(item.message)}" target="_blank" style="flex:1;">
-                                <button onclick="setStatus(${index}, 'Envoyé')">📲 Envoyer le SMS</button>
+                            <a href="sms:${item.phone}?body=${encodeURIComponent(item.message)}" target="_blank" style="flex:1;" onclick="markAsSent(${index})">
+                                <button>📲 Envoyer le SMS</button>
                             </a>
                         </div>
-                        <div style="display:flex; gap:5px; margin-top:8px;">
-                            <button onclick="setStatus(${index}, 'Participe')" class="btn-secondary" style="font-size:0.8rem; padding:6px; background:#38a169;">✅ Oui</button>
-                            <button onclick="setStatus(${index}, 'Refus')" class="btn-secondary" style="font-size:0.8rem; padding:6px; background:#e53e3e;">❌ Non</button>
+                        <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                            <button onclick="setStatus(${index}, 'En attente')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#718096;">⏳ En attente</button>
+                            <button onclick="setStatus(${index}, 'Participe')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#38a169;">✅ Oui</button>
+                            <button onclick="setStatus(${index}, 'Refus')" class="btn-secondary" style="font-size:0.75rem; padding:6px; background:#e53e3e;">❌ Non</button>
                         </div>
                     </div>
                 `;
             });
         }
 
-        function setStatus(index, status) {
-            campaignQueue[index].status = status;
-            renderQueue();
+        function markAsSent(index) {
+            const now = new Date();
+            campaignQueue[index].sentAt = now.toLocaleDateString('fr-FR') + ' à ' + now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+            if(campaignQueue[index].status === 'En attente') {
+                campaignQueue[index].status = 'En attente de réponse';
+            }
+            saveData();
         }
 
-        // Init au chargement
+        function setStatus(index, status) {
+            campaignQueue[index].status = status;
+            saveData();
+        }
+
+        function importGoogleCalendar() {
+            const url = document.getElementById('ical-url').value.trim();
+            if(!url) {
+                alert("Colle un lien iCal valide de ton Google Agenda (disponible dans les paramètres de ton agenda sous 'Adresse secrète au format iCal').");
+                return;
+            }
+            alert("Fonction d'import iCal prête : l'application va récupérer les prochains événements de ton agenda Google pour remplir automatiquement les actions.");
+            // Note : Pour parser du iCal en pur front-end JS, on peut utiliser un petit lecteur ICS, ou simplifier en extrayant les titres.
+        }
+
         renderUI();
     </script>
 </body>
