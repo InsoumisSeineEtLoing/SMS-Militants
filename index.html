@@ -658,7 +658,6 @@
 
         function goToCampaign(eventId) {
             switchView('campaigns');
-            // Optionnel : faire défiler ou mettre en évidence la campagne si besoin
         }
 
         let modalCachedEventData = null;
@@ -719,7 +718,7 @@
                 html += `
                     <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #edf2f7; font-size: 0.85rem;">
                         <label style="display: flex; align-items: center; gap: 8px; margin:0; cursor:pointer; flex:1;">
-                            <input type="checkbox" class="modal-militant-checkbox" value="${idx}" ${isAlreadyIn ? 'checked disabled' : 'checked'}>
+                            <input type="checkbox" class="modal-militant-checkbox" value="${idx}" ${isAlreadyIn ? 'disabled' : 'checked'}>
                             <div><strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge}${cityStr} <span style="color:var(--gray);">(${m.phone})</span> ${isAlreadyIn ? '<em>(déjà dedans)</em>' : ''}</div>
                         </label>
                     </div>`;
@@ -1108,6 +1107,31 @@
             renderMilitants();
         }
 
+        function editMilitant(index) {
+            let m = militants[index];
+            const newName = prompt("Prénom :", m.name);
+            if (newName === null) return;
+            const newLastname = prompt("Nom :", m.lastname || "");
+            if (newLastname === null) return;
+            const newCompany = prompt("Entreprise / Tag :", m.company || "");
+            if (newCompany === null) return;
+            const newCity = prompt("Ville :", m.city || "");
+            if (newCity === null) return;
+            const newPhone = prompt("Téléphone :", m.phone || "");
+            if (newPhone === null) return;
+
+            militants[index] = {
+                name: newName.trim(),
+                lastname: newLastname.trim(),
+                company: newCompany.trim(),
+                city: newCity.trim(),
+                phone: cleanPhone(newPhone)
+            };
+            sortMilitants();
+            saveData();
+            renderMilitants();
+        }
+
         function renderMilitants() {
             const mContainer = document.getElementById('militants-ul'); 
             const searchInput = document.getElementById('militant-search');
@@ -1132,7 +1156,10 @@
                             <strong>${m.lastname ? m.name + ' ' + m.lastname : m.name}</strong>${compBadge}${cityStr} 
                             <span style="color:var(--gray);">(${m.phone})</span>
                         </div>
-                        <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
+                        <div style="display:flex; gap:5px;">
+                            <button class="edit-btn" onclick="editMilitant(${realIndex})">✏️ Modifier</button>
+                            <button class="delete-btn" onclick="deleteMilitant(${realIndex})">Supprimer</button>
+                        </div>
                     </li>`;
             });
             if(filtered.length === 0) {
@@ -1237,7 +1264,7 @@
                 saveData(); 
                 renderMilitants(); 
                 alert(`Import terminé !\n- Ajoutés : ${addedCount}\n- Doublons ignorés : ${dupCount}\n- Sans téléphone rejetés : ${noPhoneCount}`);
-                fileInput.value = ''; // Reset input
+                fileInput.value = '';
             };
             reader.readAsText(file);
         }
