@@ -378,9 +378,24 @@
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
 
-        db.ref('templates').on('value', (snap) => { if(snap.val()) { templates = snap.val(); renderTemplates(); } });
-        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderMilitants(); } });
-        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderCampaigns(); } });
+        db.ref('templates').on('value', (snap) => { 
+            if(snap.val()) { 
+                let data = snap.val();
+                // Nettoyage si Firebase a renvoyé un tableau corrompu
+                if(Array.isArray(data)) {
+                    let fixed = {};
+                    data.forEach((item, idx) => {
+                        if(item) fixed["cat_" + idx] = item;
+                    });
+                    templates = fixed;
+                } else {
+                    templates = data;
+                }
+                renderTemplates(); 
+            } 
+        });
+        db.ref('militants').on('value', (snap) => { if(snap.val()) { militants = snap.val(); renderUI(); } });
+        db.ref('campaigns').on('value', (snap) => { if(snap.val()) { campaigns = snap.val(); renderUI(); } });
         db.ref('calendarEvents').on('value', (snap) => { if(snap.val()) { calendarEvents = snap.val(); renderCalendarEvents(); } });
 
         function saveData() {
@@ -402,6 +417,7 @@
             toggleDrawer();
             if(viewName === 'stats') renderDetailedStats();
             if(viewName === 'campaigns') renderCampaigns();
+            if(viewName === 'templates') renderTemplates();
         }
 
         function switchCalendarTab(tab) {
@@ -426,14 +442,15 @@
             renderDetailedStats();
         }
 
-        // --- GESTION DES CATEGORIES PAR LIBELLE ---
+        // --- GESTION DES CATEGORIES PAR LIBELLE ROBUSTE ---
         function addNewCategory() {
             const label = document.getElementById('new-cat-label').value.trim();
             if(!label) { alert("Saisis un libellé !"); return; }
-            const key = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
-            if(templates[key]) { alert("Cette catégorie existe déjà !"); return; }
+            const key = 'cat_' + Date.now();
 
+            if(!templates || Array.isArray(templates)) templates = {};
             templates[key] = { label: label, list: [] };
+            
             saveData();
             document.getElementById('new-cat-label').value = '';
             renderTemplates();
@@ -447,16 +464,22 @@
             container.innerHTML = '';
             select.innerHTML = '';
 
+            if(!templates || Array.isArray(templates)) templates = {
+                first: { label: "1er message", list: ["Salut {prenom}, dispo pour {action} le {date} ? Rdv {lieu}"] }
+            };
+
             for (let cat in templates) {
                 let catData = templates[cat];
-                let catLabel = typeof catData === 'object' ? catData.label : cat;
-                let catList = typeof catData === 'object' ? catData.list : catData;
+                if(!catData) continue;
+                
+                let catLabel = catData.label || cat;
+                let catList = catData.list || [];
 
                 select.innerHTML += `<option value="${cat}">${catLabel}</option>`;
                 
-                container.innerHTML += `<div style="font-weight:bold; margin-top:12px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between;"><span>${catLabel}</span> ${Object.keys(templates).length > 1 ? `<button class="delete-btn" onclick="deleteCategory('${cat}')" style="font-size:0.75rem;">Supprimer</button>` : ''}</div>`;
+                container.innerHTML += `<div style="font-weight:bold; margin-top:12px; color:var(--primary-dark); font-size:0.9rem; display:flex; justify-content:space-between;"><span>${catLabel}</span> <button class="delete-btn" onclick="deleteCategory('${cat}')" style="font-size:0.75rem;">Supprimer</button></div>`;
                 
-                if(catList) {
+                if(Array.isArray(catList) && catList.length > 0) {
                     catList.forEach((t, index) => {
                         container.innerHTML += `
                             <div style="display: flex; justify-content: space-between; align-items: center; background:#f7fafc; padding:6px 10px; border-radius:6px; margin-bottom:4px; font-size:0.85rem;">
@@ -467,12 +490,18 @@
                                 </div>
                             </div>`;
                     });
+                } else {
+                    container.innerHTML += `<div style="font-size:0.75rem; color:var(--gray); font-style:italic; margin-bottom:5px;">Aucun message dans cette catégorie.</div>`;
                 }
             }
         }
 
         function deleteCategory(cat) {
-            if(confirm("Supprimer cette catégorie ?")) { delete templates[cat]; saveData(); renderTemplates(); }
+            if(confirm("Supprimer cette catégorie ?")) { 
+                delete templates[cat]; 
+                saveData(); 
+                renderTemplates(); 
+            }
         }
 
         function addTemplate() {
@@ -490,19 +519,23 @@
 
         function editTemplate(cat, index) {
             let catData = templates[cat];
-            let currentText = Array.isArray(catData) ? catData[index] : catData.list[index];
+            let currentText = catData && catData.list ? catData.list[index] : "";
             const newText = prompt("Modifier le message :", currentText);
             if (newText !== null && newText.trim() !== "") {
-                if(Array.isArray(templates[cat])) templates[cat][index] = newText.trim();
-                else templates[cat].list[index] = newText.trim();
-                saveData(); renderTemplates();
+                if(templates[cat] && templates[cat].list) {
+                    templates[cat].list[index] = newText.trim();
+                    saveData(); 
+                    renderTemplates();
+                }
             }
         }
 
         function deleteTemplate(cat, index) {
-            if(Array.isArray(templates[cat])) templates[cat].splice(index, 1);
-            else templates[cat].list.splice(index, 1);
-            saveData(); renderTemplates();
+            if(templates[cat] && templates[cat].list) {
+                templates[cat].list.splice(index, 1);
+                saveData(); 
+                renderTemplates();
+            }
         }
 
         // --- AGENDA ---
@@ -583,7 +616,7 @@
             }
         }
 
-        // --- CAMPAGNES & SOUS-TITRE + STATUT AUTO ---
+        // --- CAMPAGNES ---
         function renderCampaigns() {
             const container = document.getElementById('campaigns-container');
             if(!container) return;
@@ -631,7 +664,7 @@
 
                     let templateOptions = '';
                     for (let cat in templates) {
-                        let cLabel = typeof templates[cat] === 'object' ? templates[cat].label : cat;
+                        let cLabel = templates[cat]?.label || cat;
                         templateOptions += `<option value="${cat}">${cLabel}</option>`;
                     }
 
