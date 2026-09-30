@@ -364,7 +364,8 @@
                 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
                     <label>Importer un CSV / Google Contacts :</label>
-                    <input type="file" id="csv-file" accept=".csv" onchange="importCSV(event)" style="margin-bottom:0;">
+                    <input type="file" id="csv-file" accept=".csv" style="margin-bottom:10px;">
+                    <button onclick="processCSVImport()" class="btn-secondary" style="background:var(--info);">📥 Lancer l'importation du CSV</button>
                 </div>
 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
@@ -635,7 +636,6 @@
                 const safeLocation = locationStr.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const eventId = "ev_" + (ev.timestamp || idx);
 
-                // Vérifier si une campagne existe pour cet événement
                 let activeCampBadge = '';
                 if(campaigns[eventId]) {
                     let totalM = campaigns[eventId].queue ? campaigns[eventId].queue.length : 0;
@@ -750,11 +750,6 @@
                 }
             });
 
-            if(selectedMilitants.length === 0 && !campaigns[modalTargetEventId]) {
-                alert("Sélectionne au moins un militant !");
-                return;
-            }
-
             if(!campaigns[modalTargetEventId]) {
                 campaigns[modalTargetEventId] = {
                     name: modalCachedEventData.name,
@@ -765,6 +760,7 @@
                     queue: selectedMilitants
                 };
             } else {
+                if(!campaigns[modalTargetEventId].queue) campaigns[modalTargetEventId].queue = [];
                 let currentPhones = campaigns[modalTargetEventId].queue.map(q => cleanPhone(q.phone));
                 selectedMilitants.forEach(sm => {
                     if(!currentPhones.includes(cleanPhone(sm.phone))) {
@@ -820,7 +816,8 @@
                 count++;
 
                 let stats = { oui: 0, non: 0, attente: 0, contacter: 0 };
-                camp.queue.forEach(item => {
+                let queueList = camp.queue || [];
+                queueList.forEach(item => {
                     if(item.status === 'Participe') stats.oui++;
                     else if(item.status === 'Refus') stats.non++;
                     else if(item.status === 'En attente de réponse') stats.attente++;
@@ -829,8 +826,8 @@
 
                 let currentFilter = activeFilterStatus[eventId] || 'all';
                 let queueHtml = '';
-                camp.queue.filter(item => currentFilter === 'all' || item.status === currentFilter).forEach((item) => {
-                    let realIndex = camp.queue.indexOf(item);
+                queueList.filter(item => currentFilter === 'all' || item.status === currentFilter).forEach((item) => {
+                    let realIndex = queueList.indexOf(item);
                     let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info'));
                     const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
                     const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
@@ -898,7 +895,7 @@
                             <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${stats.attente}</span>
                         </div>
 
-                        <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant.</p>'}</div>
+                        <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant dans cette campagne. Clique sur "Ajouter des militants" pour en inclure.</p>'}</div>
                     </div>`;
             }
             if(count === 0) container.innerHTML = `<p style="font-size:0.85rem; color: var(--gray);">Aucune campagne ${currentCampTab === 'current' ? 'en cours' : 'passée'}.</p>`;
@@ -1152,8 +1149,14 @@
             return result;
         }
 
-        function importCSV(e) {
-            const file = e.target.files[0]; if (!file) return;
+        function processCSVImport() {
+            const fileInput = document.getElementById('csv-file');
+            const file = fileInput.files[0]; 
+            if (!file) {
+                alert("Veuillez d'abord sélectionner un fichier CSV !");
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = function(evt) {
                 let lines = evt.target.result.split('\n');
@@ -1215,6 +1218,7 @@
                 saveData(); 
                 renderMilitants(); 
                 alert(`Import terminé !\n- Ajoutés : ${addedCount}\n- Doublons ignorés : ${dupCount}\n- Sans téléphone rejetés : ${noPhoneCount}`);
+                fileInput.value = ''; // Reset input
             };
             reader.readAsText(file);
         }
