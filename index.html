@@ -229,7 +229,7 @@
             cursor: pointer;
             border: 1px solid transparent;
         }
-        .stats-badge:hover { border-color: var(--gray); }
+        .stats-badge:hover { border-color: var(--gray); opacity: 0.9; }
         
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
         .nav-tabs button {
@@ -244,7 +244,6 @@
         .view-section { display: none; }
         .view-section.active { display: block; }
 
-        /* MODALE PROPRE ET BIEN ALIGNÉE */
         .modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 2000;
@@ -292,7 +291,7 @@
         <button id="nav-btn-stats" class="drawer-nav-item" onclick="switchView('stats')">📊 Statistiques</button>
     </nav>
 
-    <!-- MODALE DE SELECTION PROPRE EN 2 ÉTAPES -->
+    <!-- MODALE DE SELECTION -->
     <div id="militant-modal" class="modal">
         <div class="modal-content">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #edf2f7; padding-bottom: 10px; margin-bottom: 10px;">
@@ -300,9 +299,8 @@
                 <button onclick="closeMilitantModal()" style="background:none; border:none; font-size:1.4rem; cursor:pointer; color:var(--gray); width:auto; padding:0;">✕</button>
             </div>
 
-            <!-- ÉTAPE 1 : SELECTION DES TAGS -->
             <div id="modal-step-tags" style="display:flex; flex-direction:column; flex:1; overflow:hidden;">
-                <p style="font-size:0.85rem; color:var(--gray); margin:0 0 10px 0;"><strong>Étape 1 :</strong> Cochez un ou plusieurs tags/entreprises (laissez tout décoché pour inclure tout le monde) :</p>
+                <p style="font-size:0.85rem; color:var(--gray); margin:0 0 10px 0;"><strong>Étape 1 :</strong> Cochez un ou plusieurs tags/entreprises :</p>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
                     <button onclick="toggleSelectAllTags(true)" class="btn-secondary" style="padding:8px; font-size:0.8rem;">Tout cocher</button>
                     <button onclick="toggleSelectAllTags(false)" class="btn-secondary" style="padding:8px; font-size:0.8rem;">Tout décocher</button>
@@ -311,7 +309,6 @@
                 <button onclick="goToModalMilitantsStep()" style="background:var(--info); margin-top:5px;">Suivant : Choisir les militants ➔</button>
             </div>
 
-            <!-- ÉTAPE 2 : SELECTION DES MILITANTS -->
             <div id="modal-step-militants" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <button onclick="backToModalTagsStep()" class="btn-secondary" style="width:auto; padding:6px 12px; font-size:0.8rem; background:var(--gray);">⬅️ Retour aux tags</button>
@@ -320,7 +317,7 @@
                         <button onclick="toggleSelectAllMilitants(false)" class="btn-secondary" style="padding:6px 10px; font-size:0.8rem;">Tout décocher</button>
                     </div>
                 </div>
-                <input type="text" id="modal-search" placeholder="🔍 Rechercher par nom, ville..." oninput="renderModalMilitantsList()" style="margin-bottom:10px; font-size:0.85rem;">
+                <input type="text" id="modal-search" placeholder="🔍 Rechercher par prénom, nom, ville..." oninput="renderModalMilitantsList()" style="margin-bottom:10px; font-size:0.85rem;">
                 <div class="modal-body" id="modal-militants-list" style="background:#fff;"></div>
                 <div style="display: flex; gap: 10px; margin-top: 5px;">
                     <button onclick="closeMilitantModal()" class="btn-secondary" style="background:var(--gray);">Annuler</button>
@@ -374,7 +371,7 @@
                 <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
                 
                 <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
-                    <label style="font-size:0.85rem;">Ajouter une catégorie (Libellé simple) :</label>
+                    <label style="font-size:0.85rem;">Ajouter une catégorie :</label>
                     <input type="text" id="new-cat-label" placeholder="Ex: Rappel Jour-même" style="margin-bottom:10px;">
                     <button onclick="addNewCategory()" class="btn-secondary" style="padding: 8px;">Créer la catégorie</button>
                 </div>
@@ -397,8 +394,8 @@
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px; flex: 1; min-width: 80px;">
                     <input type="text" id="m-lastname" placeholder="Nom" style="margin-bottom:10px; flex: 1; min-width: 80px;">
-                    <input type="text" id="m-company" placeholder="Entreprise / Tag (ex: LFI)" style="margin-bottom:10px; flex: 1; min-width: 90px;">
-                    <input type="text" id="m-city" placeholder="Lieu / Ville" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="text" id="m-company" placeholder="Tag (ex: LFI)" style="margin-bottom:10px; flex: 1; min-width: 90px;">
+                    <input type="text" id="m-city" placeholder="Ville" style="margin-bottom:10px; flex: 1; min-width: 90px;">
                     <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px; flex: 1; min-width: 100px;">
                 </div>
                 <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
@@ -411,7 +408,7 @@
 
                 <div style="margin-top: 15px; border-top: 1px solid #edf2f7; padding-top: 15px;">
                     <label>Filtrer les militants :</label>
-                    <input type="text" id="militant-search" placeholder="Rechercher par nom, entreprise ou ville..." oninput="renderMilitants()" style="margin-bottom:0;">
+                    <input type="text" id="militant-search" placeholder="Rechercher par prénom, nom, entreprise ou ville..." oninput="renderMilitants()" style="margin-bottom:0;">
                 </div>
 
                 <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
@@ -429,13 +426,19 @@
                     <button id="tab-stat-militant" onclick="switchStatTab('militant')">👤 Par Militant</button>
                 </div>
 
-                <div id="stat-filter-container" style="margin-bottom:15px; display:flex; gap:10px; align-items:flex-end;">
-                    <div style="flex:1;">
-                        <label style="font-size:0.8rem;" id="stat-filter-label">Filtrer :</label>
-                        <div id="stat-filter-input-wrapper"></div>
+                <div style="background: #fff; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Du :</label><input type="date" id="stat-period-start" onchange="renderDetailedStats()" style="margin-bottom:0; font-size:0.85rem; background:#fff;"></div>
+                        <div style="flex:1;"><label style="font-size:0.75rem;">Au :</label><input type="date" id="stat-period-end" onchange="renderDetailedStats()" style="margin-bottom:0; font-size:0.85rem; background:#fff;"></div>
                     </div>
-                    <div>
-                        <button onclick="exportCurrentStatsCSV()" class="btn-secondary" style="background:var(--success); font-size:0.85rem; padding:10px 15px; white-space:nowrap;">📥 Exporter CSV</button>
+                    <div id="stat-filter-container" style="display:flex; gap:10px; align-items:flex-end; margin-bottom: 5px;">
+                        <div style="flex:1;">
+                            <label style="font-size:0.8rem;" id="stat-filter-label">Filtrer :</label>
+                            <div id="stat-filter-input-wrapper"></div>
+                        </div>
+                        <div>
+                            <button onclick="exportCurrentStatsCSV()" class="btn-secondary" style="background:var(--success); font-size:0.85rem; padding:10px 15px; white-space:nowrap;">📥 Exporter CSV</button>
+                        </div>
                     </div>
                 </div>
 
@@ -474,7 +477,9 @@
         
         let activeCampaignFilters = {}; 
         let activeCampaignSorts = {};   
-        let expandedCampaigns = {};    
+        let expandedCampaigns = {};
+        let campaignSearches = {}; // Recherche par campagne
+        let globalStatStatusFilter = 'all'; // Filtre par statut dans les stats globales
 
         let currentTab = 'upcoming';
         let currentCampTab = 'current';
@@ -504,15 +509,16 @@
             db.ref('campaigns').set(campaigns);
         }
 
+        // Tri alphabétique par PRÉNOM puis NOM
         function sortMilitants() {
             militants.sort((a, b) => {
-                let compA = (a.company || "").toLowerCase();
-                let compB = (b.company || "").toLowerCase();
-                if (compA < compB) return -1;
-                if (compA > compB) return 1;
-                let nameA = `${a.name} ${a.lastname || ""}`.toLowerCase();
-                let nameB = `${b.name} ${b.lastname || ""}`.toLowerCase();
-                return nameA.localeCompare(nameB);
+                let nameA = (a.name || "").toLowerCase();
+                let nameB = (b.name || "").toLowerCase();
+                if (nameA < nameB) return -1;
+                if (nameA > nameB) return 1;
+                let lastA = (a.lastname || "").toLowerCase();
+                let lastB = (b.lastname || "").toLowerCase();
+                return lastA.localeCompare(lastB);
             });
         }
 
@@ -551,6 +557,7 @@
 
         function switchStatTab(tab) {
             currentStatTab = tab;
+            globalStatStatusFilter = 'all'; // Reset du filtre de statut au changement d'onglet
             document.getElementById('tab-stat-date').className = (tab === 'date') ? 'active' : '';
             document.getElementById('tab-stat-action').className = (tab === 'action') ? 'active' : '';
             document.getElementById('tab-stat-militant').className = (tab === 'militant') ? 'active' : '';
@@ -741,7 +748,7 @@
             let companies = [...new Set(militants.map(m => m.company).filter(Boolean))].sort();
 
             let html = '';
-            companies.forEach((comp, idx) => {
+            companies.forEach((comp) => {
                 html += `
                     <div class="modal-item-row" onclick="const cb=this.querySelector('input'); cb.checked=!cb.checked;">
                         <input type="checkbox" class="modal-tag-checkbox" value="${comp}">
@@ -888,6 +895,11 @@
             renderCampaigns();
         }
 
+        function updateCampaignSearch(eventId, val) {
+            campaignSearches[eventId] = val;
+            renderCampaigns();
+        }
+
         function renderCampaigns() {
             const container = document.getElementById('campaigns-container');
             if(!container) return;
@@ -898,20 +910,24 @@
                 return;
             }
 
-            const now = new Date().getTime();
+            const now = new Date().setHours(0,0,0,0);
             let sortOrder = document.getElementById('campaign-sort-order')?.value || 'asc';
 
             let campEntries = Object.entries(campaigns).map(([id, camp]) => {
                 let isPast = false;
-                if(camp.timestamp && camp.timestamp < now) isPast = true;
-                else if(camp.rawDate) {
+                let evTimestamp = camp.timestamp || 0;
+                
+                if(camp.rawDate) {
                     let parts = camp.rawDate.split('/');
                     if(parts.length === 3) {
                         let evDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-                        if(evDate.getTime() < new Date().setHours(0,0,0,0)) isPast = true;
+                        evTimestamp = evDate.getTime();
+                        if(evDate.getTime() < now) isPast = true;
                     }
+                } else if(evTimestamp > 0 && evTimestamp < now) {
+                    isPast = true;
                 }
-                return { id, camp, isPast, timestamp: camp.timestamp || 0 };
+                return { id, camp, isPast, timestamp: evTimestamp };
             });
 
             campEntries.sort((a, b) => {
@@ -939,17 +955,23 @@
                 let isExpanded = !!expandedCampaigns[eventId];
                 let currentFilter = activeCampaignFilters[eventId] || 'all';
                 let currentSort = activeCampaignSorts[eventId] || 'name';
+                let currentSearch = (campaignSearches[eventId] || '').toLowerCase();
 
                 let filteredQueue = queueList.filter(item => {
-                    if (currentFilter === 'all') return true;
-                    return item.status === currentFilter;
+                    if (currentFilter !== 'all' && item.status !== currentFilter) return false;
+                    if (currentSearch) {
+                        let fullName = `${item.name} ${item.lastname || ''} ${item.company || ''} ${item.city || ''} ${item.phone}`.toLowerCase();
+                        if (!fullName.includes(currentSearch)) return false;
+                    }
+                    return true;
                 });
 
                 filteredQueue.sort((a, b) => {
                     if (currentSort === 'name') {
-                        let nameA = `${a.name} ${a.lastname || ''}`.toLowerCase();
-                        let nameB = `${b.name} ${b.lastname || ''}`.toLowerCase();
-                        return nameA.localeCompare(nameB);
+                        let nameA = (a.name || '').toLowerCase();
+                        let nameB = (b.name || '').toLowerCase();
+                        if (nameA !== nameB) return nameA.localeCompare(nameB);
+                        return (a.lastname || '').toLowerCase().localeCompare((b.lastname || '').toLowerCase());
                     } else if (currentSort === 'status') {
                         return (a.status || '').localeCompare(b.status || '');
                     } else if (currentSort === 'sent') {
@@ -1032,6 +1054,10 @@
                                     <button onclick="saveCampaignDetails('${eventId}')" class="btn-secondary" style="padding: 4px; font-size: 0.75rem; background: var(--info);">💾 Enregistrer les modifications SMS</button>
                                 </div>
 
+                                <div style="margin-bottom: 12px;">
+                                    <input type="text" placeholder="🔍 Rechercher un militant dans cette campagne..." value="${campaignSearches[eventId] || ''}" oninput="updateCampaignSearch('${eventId}', this.value)" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                                </div>
+
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:10px; flex-wrap:wrap;">
                                     <div style="display:flex; gap:10px;">
                                         <button onclick="openAddMilitantsToCampaign('${eventId}')" class="btn-secondary" style="font-size:0.75rem; padding:6px 10px; background:var(--info);">➕ Ajouter des militants</button>
@@ -1040,13 +1066,13 @@
                                     <div style="display:flex; align-items:center; gap:5px;">
                                         <label style="font-size:0.75rem; margin:0;">Trier militants :</label>
                                         <select onchange="sortCampaignQueue('${eventId}', this.value)" style="width:auto; margin-bottom:0; font-size:0.75rem; background:#fff; padding:4px;">
-                                            <option value="name" ${currentSort==='name'?'selected':''}>Par nom</option>
+                                            <option value="name" ${currentSort==='name'?'selected':''}>Par prénom</option>
                                             <option value="status" ${currentSort==='status'?'selected':''}>Par statut</option>
                                             <option value="sent" ${currentSort==='sent'?'selected':''}>Par date d'envoi</option>
                                         </select>
                                     </div>
                                 </div>
-                                <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant pour ce filtre.</p>'}</div>
+                                <div>${queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond à la recherche/filtre.</p>'}</div>
                             </div>
                         ` : ''}
                     </div>`;
@@ -1089,6 +1115,11 @@
         function setStatus(eventId, index, status) { campaigns[eventId].queue[index].status = status; saveData(); renderCampaigns(); }
         function deleteCampaign(eventId) { if(confirm("Supprimer cette campagne ?")) { delete campaigns[eventId]; saveData(); renderCampaigns(); } }
 
+        function setGlobalStatStatusFilter(status) {
+            globalStatStatusFilter = status;
+            renderDetailedStats();
+        }
+
         function renderDetailedStats() {
             const inputWrapper = document.getElementById('stat-filter-input-wrapper');
             const filterLabel = document.getElementById('stat-filter-label');
@@ -1097,9 +1128,27 @@
             if(!inputWrapper) return;
 
             let currentSelected = document.getElementById('stat-filter-val')?.value || 'all';
+            let periodStart = document.getElementById('stat-period-start')?.value || '';
+            let periodEnd = document.getElementById('stat-period-end')?.value || '';
+
+            let pStartTime = periodStart ? new Date(periodStart).setHours(0,0,0,0) : null;
+            let pEndTime = periodEnd ? new Date(periodEnd).setHours(23,59,59,999) : null;
+
+            // Fonction auxiliaire pour vérifier si une campagne est dans la période
+            function isCampInPeriod(camp) {
+                if(!pStartTime && !pEndTime) return true;
+                let cTime = camp.timestamp || 0;
+                if(camp.rawDate) {
+                    let parts = camp.rawDate.split('/');
+                    if(parts.length === 3) cTime = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+                }
+                if(pStartTime && cTime < pStartTime) return false;
+                if(pEndTime && cTime > pEndTime) return false;
+                return true;
+            }
 
             if (currentStatTab === 'date') {
-                filterLabel.innerText = "Filtrer par date (Calendrier) :";
+                filterLabel.innerText = "Filtrer par date précise :";
                 inputWrapper.innerHTML = `<input type="date" id="stat-filter-val" value="${currentSelected === 'all' ? '' : currentSelected}" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;">`;
                 let selectedDateStr = document.getElementById('stat-filter-val').value;
 
@@ -1109,49 +1158,61 @@
                     if(parts.length === 3) targetDateFormatted = `${parts[2]}/${parts[1]}/${parts[0]}`;
                 }
 
-                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, totalContacted = 0, html = '';
+                let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, html = '';
+                
                 Object.values(campaigns).forEach(camp => {
+                    if (!isCampInPeriod(camp)) return;
                     if (targetDateFormatted && !camp.date.includes(targetDateFormatted)) return;
+
                     let cYes = 0, cMaybe = 0, cNo = 0, cWaiting = 0, cContact = 0, rows = '';
                     if (camp.queue) {
                         camp.queue.forEach(item => {
-                            if(item.sentAt) totalContacted++;
                             if(item.status === 'Participe') { cYes++; totalYes++; }
                             else if(item.status === 'Peut-être') { cMaybe++; totalMaybe++; }
                             else if(item.status === 'Refus') { cNo++; totalNo++; }
                             else if(item.status === 'En attente de réponse') { cWaiting++; totalWaiting++; }
                             else if(item.status === 'À contacter') { cContact++; totalContact++; }
 
+                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+
                             let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
                             rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
+
+                    if(globalStatStatusFilter !== 'all' && !rows) return;
+
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📅 Date : ${camp.date} — ${camp.originalName || camp.name}</h3>
                         <div style="margin-bottom:8px;">
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
-                            <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
-                            <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
-                            <span class="stats-badge" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
-                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
                     </div>`;
                 });
+
+                let filterActiveTag = globalStatStatusFilter !== 'all' ? ` <button onclick="setGlobalStatStatusFilter('all')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem; background:var(--gray);">Annuler le filtre (${globalStatStatusFilter}) ✕</button>` : '';
+
                 globalContainer.innerHTML = `
-                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> 
-                    <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
-                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> 
-                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
-                    <span class="stats-badge" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
+                    <div style="margin-bottom:5px;"><strong>Statistiques globales (période sélectionnée) :</strong>${filterActiveTag}</div>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:${globalStatStatusFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${totalYes}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:${globalStatStatusFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:${globalStatStatusFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${totalNo}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ Attente : ${totalWaiting}</span>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:${globalStatStatusFilter==='À contacter'?'#cbd5e0':'#edf2f7'}; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
                 `;
-                detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette date.</p>';
+                detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée pour cette période/filtre.</p>';
             }
 
             else if (currentStatTab === 'action') {
                 filterLabel.innerText = "Filtrer par action :";
                 let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Toutes les actions</option>`;
                 for(let id in campaigns) {
+                    if (!isCampInPeriod(campaigns[id])) continue;
                     selectHtml += `<option value="${id}" ${currentSelected === id ? 'selected' : ''}>${campaigns[id].originalName || campaigns[id].name} (${campaigns[id].date})</option>`;
                 }
                 selectHtml += `</select>`;
@@ -1159,8 +1220,10 @@
 
                 let totalYes = 0, totalMaybe = 0, totalNo = 0, totalWaiting = 0, totalContact = 0, html = '';
                 for (let id in campaigns) {
-                    if(currentSelected !== 'all' && currentSelected !== id) continue;
                     let camp = campaigns[id];
+                    if (!isCampInPeriod(camp)) continue;
+                    if(currentSelected !== 'all' && currentSelected !== id) continue;
+
                     let cYes = 0, cMaybe = 0, cNo = 0, cWaiting = 0, cContact = 0, rows = '';
                     if(camp.queue) {
                         camp.queue.forEach(item => {
@@ -1170,28 +1233,37 @@
                             else if(item.status === 'En attente de réponse') { cWaiting++; totalWaiting++; }
                             else if(item.status === 'À contacter') { cContact++; totalContact++; }
 
+                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+
                             let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
                             rows += `<tr style="border-bottom: 1px solid #edf2f7; font-size:0.85rem;"><td style="padding: 6px;">${item.lastname ? item.name + ' ' + item.lastname : item.name}</td><td style="padding: 6px;">${item.phone}</td><td style="padding: 6px;"><span class="tag ${badgeClass}">${item.status}</span></td><td style="padding: 6px; color:var(--gray);">${item.sentAt || 'Jamais'}</td></tr>`;
                         });
                     }
+
+                    if(globalStatStatusFilter !== 'all' && !rows) continue;
+
                     html += `<div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">📍 Action : ${camp.originalName || camp.name} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${camp.date})</span></h3>
                         <div style="margin-bottom:8px;">
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
-                            <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
-                            <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
-                            <span class="stats-badge" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${cYes}</span> 
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${cMaybe}</span> 
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${cNo}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${cWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${cContact}</span>
                         </div>
-                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows}</tbody></table>
+                        <table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Militant</th><th style="padding:4px;">Tél</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact</th></tr></thead><tbody>${rows || '<tr><td colspan="4" style="padding:8px; text-align:center; color:var(--gray); font-style:italic;">Aucun militant pour ce filtre de statut.</td></tr>'}</tbody></table>
                     </div>`;
                 }
+
+                let filterActiveTag = globalStatStatusFilter !== 'all' ? ` <button onclick="setGlobalStatStatusFilter('all')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem; background:var(--gray);">Annuler le filtre (${globalStatStatusFilter}) ✕</button>` : '';
+
                 globalContainer.innerHTML = `
-                    <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${totalYes}</span> 
-                    <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
-                    <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${totalNo}</span> 
-                    <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
-                    <span class="stats-badge" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
+                    <div style="margin-bottom:5px;"><strong>Statistiques globales (période sélectionnée) :</strong>${filterActiveTag}</div>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:${globalStatStatusFilter==='Participe'?'#b2f5ea':'#e6fffa'}; color:#00796b;">✅ Oui : ${totalYes}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:${globalStatStatusFilter==='Peut-être'?'#e9d8fd':'#f3e8ff'}; color:#805ad5;">🤔 Peut-être : ${totalMaybe}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:${globalStatStatusFilter==='Refus'?'#fed7d7':'#ffebee'}; color:#c62828;">❌ Non : ${totalNo}</span> 
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:${globalStatStatusFilter==='En attente de réponse'?'#fefcbf':'#fff9c4'}; color:#fbc02d;">⏳ En attente de réponse : ${totalWaiting}</span>
+                    <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:${globalStatStatusFilter==='À contacter'?'#cbd5e0':'#edf2f7'}; color:#4a5568;">🔄 À contacter : ${totalContact}</span>
                 `;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucune donnée.</p>';
             }
@@ -1199,16 +1271,17 @@
             else if (currentStatTab === 'militant') {
                 filterLabel.innerText = "Filtrer par militant :";
                 
-                // Tri alphabétique des militants dans le menu déroulant
+                // Tri alphabétique par PRÉNOM pour le select militant
                 let sortedMilitantsForSelect = [...militants].sort((a, b) => {
-                    let nameA = `${a.lastname || ''} ${a.name}`.toLowerCase();
-                    let nameB = `${b.lastname || ''} ${b.name}`.toLowerCase();
-                    return nameA.localeCompare(nameB);
+                    let nameA = (a.name || "").toLowerCase();
+                    let nameB = (b.name || "").toLowerCase();
+                    if (nameA !== nameB) return nameA.localeCompare(nameB);
+                    return (a.lastname || "").toLowerCase().localeCompare((b.lastname || "").toLowerCase());
                 });
 
-                let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Tous les militants (tri alphabétique)</option>`;
+                let selectHtml = `<select id="stat-filter-val" onchange="renderDetailedStats()" style="background:#fff; margin-bottom:0; font-size:0.85rem;"><option value="all">Tous les militants (tri par prénom)</option>`;
                 sortedMilitantsForSelect.forEach((m) => {
-                    let mName = m.lastname ? `${m.lastname} ${m.name}` : m.name;
+                    let mName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
                     selectHtml += `<option value="${m.phone}" ${currentSelected === m.phone ? 'selected' : ''}>${mName} (${m.phone})</option>`;
                 });
                 selectHtml += `</select>`;
@@ -1222,9 +1295,12 @@
                     let mYes = 0, mMaybe = 0, mNo = 0, mWaiting = 0, mContact = 0, mParticipations = 0;
 
                     Object.values(campaigns).forEach(camp => {
+                        if (!isCampInPeriod(camp)) return;
                         if (camp.queue) {
                             camp.queue.forEach(item => {
                                 if (cleanPhone(item.phone) === mPhoneClean) {
+                                    if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
+
                                     mParticipations++;
                                     if (item.status === 'Participe') mYes++;
                                     else if (item.status === 'Peut-être') mMaybe++;
@@ -1243,6 +1319,8 @@
                         }
                     });
 
+                    if (globalStatStatusFilter !== 'all' && !historyRows) return;
+
                     let mDisplayName = m.lastname ? `${m.name} ${m.lastname}` : m.name;
                     let compBadge = m.company ? ` <span class="tag bg-info">${m.company}</span>` : '';
                     let cityStr = m.city ? ` (${m.city})` : '';
@@ -1251,28 +1329,49 @@
                         <h3 style="margin-top:0; color:var(--primary-dark); font-size:1rem;">👤 ${mDisplayName}${compBadge}${cityStr} <span style="font-weight:normal; font-size:0.8rem; color:var(--gray);">(${m.phone})</span></h3>
                         <div style="margin-bottom:8px;">
                             <span class="stats-badge">📌 Actions : ${mParticipations}</span>
-                            <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${mYes}</span>
-                            <span class="stats-badge" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${mMaybe}</span>
-                            <span class="stats-badge" style="background:#ffebee; color:#c62828;">❌ Non : ${mNo}</span>
-                            <span class="stats-badge" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${mWaiting}</span>
-                            <span class="stats-badge" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${mContact}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Participe')" style="background:#e6fffa; color:#00796b;">✅ Oui : ${mYes}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Peut-être')" style="background:#f3e8ff; color:#805ad5;">🤔 Peut-être : ${mMaybe}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('Refus')" style="background:#ffebee; color:#c62828;">❌ Non : ${mNo}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('En attente de réponse')" style="background:#fff9c4; color:#fbc02d;">⏳ Attente : ${mWaiting}</span>
+                            <span class="stats-badge" onclick="setGlobalStatStatusFilter('À contacter')" style="background:#edf2f7; color:#4a5568;">🔄 À contacter : ${mContact}</span>
                         </div>
-                        ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce militant.</p>'}
+                        ${historyRows ? `<table style="width:100%; border-collapse: collapse; text-align: left;"><thead><tr style="background:#f7fafc; font-size:0.75rem; color:var(--gray);"><th style="padding:4px;">Action / Date</th><th style="padding:4px;">Statut</th><th style="padding:4px;">Contact SMS</th></tr></thead><tbody>${historyRows}</tbody></table>` : '<p style="font-size:0.8rem; color:var(--gray); font-style:italic;">Aucune campagne enregistrée pour ce filtre.</p>'}
                     </div>`;
                 });
-                globalContainer.innerHTML = `<span class="stats-badge" style="background:#edf2f7; color:#2d3748;">👥 Total Militants dans le carnet : ${militants.length} (triés par ordre alphabétique)</span>`;
+
+                let filterActiveTag = globalStatStatusFilter !== 'all' ? ` <button onclick="setGlobalStatStatusFilter('all')" class="btn-secondary" style="width:auto; padding:4px 8px; font-size:0.75rem; background:var(--gray);">Annuler le filtre (${globalStatStatusFilter}) ✕</button>` : '';
+
+                globalContainer.innerHTML = `<div style="margin-bottom:5px;"><strong>Carnet :</strong>${filterActiveTag}</div><span class="stats-badge" style="background:#edf2f7; color:#2d3748;">👥 Total Militants : ${militants.length} (triés par prénom)</span>`;
                 detailedContainer.innerHTML = html || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant sélectionné.</p>';
             }
         }
 
         function exportCurrentStatsCSV() {
             let csvContent = "data:text/csv;charset=utf-8,";
+            let periodStart = document.getElementById('stat-period-start')?.value || '';
+            let periodEnd = document.getElementById('stat-period-end')?.value || '';
+            let pStartTime = periodStart ? new Date(periodStart).setHours(0,0,0,0) : null;
+            let pEndTime = periodEnd ? new Date(periodEnd).setHours(23,59,59,999) : null;
+
+            function isCampInPeriod(camp) {
+                if(!pStartTime && !pEndTime) return true;
+                let cTime = camp.timestamp || 0;
+                if(camp.rawDate) {
+                    let parts = camp.rawDate.split('/');
+                    if(parts.length === 3) cTime = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+                }
+                if(pStartTime && cTime < pStartTime) return false;
+                if(pEndTime && cTime > pEndTime) return false;
+                return true;
+            }
             
             if (currentStatTab === 'date' || currentStatTab === 'action') {
                 csvContent += "Action,DateAction,Lieu,NomMilitant,Telephone,StatutMilitant,DateContactSMS\r\n";
                 Object.values(campaigns).forEach(camp => {
+                    if (!isCampInPeriod(camp)) return;
                     if (camp.queue) {
                         camp.queue.forEach(item => {
+                            if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
                             let fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
                             let row = [
                                 `"${(camp.originalName || camp.name).replace(/"/g, '""')}"`,
@@ -1290,9 +1389,10 @@
             } else if (currentStatTab === 'militant') {
                 csvContent += "NomMilitant,Entreprise,Ville,Telephone,Action,DateAction,StatutMilitant,DateContactSMS\r\n";
                 let sortedMilitantsForCSV = [...militants].sort((a, b) => {
-                    let nameA = `${a.lastname || ''} ${a.name}`.toLowerCase();
-                    let nameB = `${b.lastname || ''} ${b.name}`.toLowerCase();
-                    return nameA.localeCompare(nameB);
+                    let nameA = (a.name || "").toLowerCase();
+                    let nameB = (b.name || "").toLowerCase();
+                    if (nameA !== nameB) return nameA.localeCompare(nameB);
+                    return (a.lastname || "").toLowerCase().localeCompare((b.lastname || "").toLowerCase());
                 });
 
                 sortedMilitantsForCSV.forEach(m => {
@@ -1301,9 +1401,11 @@
                     let foundAny = false;
 
                     Object.values(campaigns).forEach(camp => {
+                        if (!isCampInPeriod(camp)) return;
                         if (camp.queue) {
                             camp.queue.forEach(item => {
                                 if (cleanPhone(item.phone) === mPhoneClean) {
+                                    if (globalStatStatusFilter !== 'all' && item.status !== globalStatStatusFilter) return;
                                     foundAny = true;
                                     let row = [
                                         `"${mName.replace(/"/g, '""')}"`,
@@ -1321,7 +1423,7 @@
                         }
                     });
 
-                    if (!foundAny) {
+                    if (!foundAny && globalStatStatusFilter === 'all') {
                         let row = [
                             `"${mName.replace(/"/g, '""')}"`,
                             `"${(m.company || '').replace(/"/g, '""')}"`,
@@ -1395,7 +1497,7 @@
             if (newName === null) return;
             const newLastname = prompt("Nom :", m.lastname || "");
             if (newLastname === null) return;
-            const newCompany = prompt("Entreprise / Tag :", m.company || "");
+            const newCompany = prompt("Tag / Entreprise :", m.company || "");
             if (newCompany === null) return;
             const newCity = prompt("Ville :", m.city || "");
             if (newCity === null) return;
