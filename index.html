@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MilitantSMS - Organisateur d'Actions</title>
+    <style>
+        :root {
+            --primary: #e53935;
+            --primary-dark: #c62828;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --gray: #718096;
+            --success: #38a169;
+            --danger: #e53e3e;
+            --warning: #d69e2e;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            padding-bottom: 50px;
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            color: var(--primary-dark);
+            border-bottom: 2px solid #edf2f7;
+            padding-bottom: 8px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background-color: #4a5568;
+        }
+        .btn-secondary:hover {
+            background-color: #2d3748;
+        }
+
+        .sms-item {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: white;
+        }
+        .bg-success { background-color: var(--success); }
+        .bg-danger { background-color: var(--danger); }
+        .bg-warning { background-color: var(--warning); }
+        .bg-gray { background-color: var(--gray); }
+
+        .message-preview {
+            background: #edf2f7;
+            padding: 10px;
+            border-radius: 6px;
+            font-style: italic;
+            font-size: 0.95rem;
+            margin: 10px 0;
+        }
+
+        .actions-flex {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .list-group {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .list-group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            font-weight: bold;
+            width: auto;
+            padding: 5px 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>MilitantSMS 📢</h1>
+        <p style="margin:0; font-size: 0.9rem;">Organisation semi-automatisée par SMS</p>
+    </header>
+
+    <div class="container">
+
+        <!-- CONFIGURATION DES MESSAGES TYPES -->
+        <div class="card">
+            <h2>💬 Mes Messages Types Aléatoires</h2>
+            <p style="font-size: 0.85rem; color: var(--gray);">L'appli piochera au hasard l'un de ces messages pour chaque militant.</p>
+            <div id="templates-list"></div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <input type="text" id="new-template" placeholder="Ex: Salut {prenom} ! Dispo pour {action} le {date} ?" style="margin-bottom:0;">
+                <button onclick="addTemplate()" style="width: auto;">Ajouter</button>
+            </div>
+        </div>
+
+        <!-- GESTION DES MILITANTS -->
+        <div class="card">
+            <h2>👥 Carnet de Militants</h2>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="m-name" placeholder="Prénom" style="margin-bottom:10px;">
+                <input type="tel" id="m-phone" placeholder="0600000000" style="margin-bottom:10px;">
+            </div>
+            <button onclick="addMilitant()" class="btn-secondary">Ajouter un militant</button>
+            <ul id="militants-ul" class="list-group" style="margin-top: 15px;"></ul>
+        </div>
+
+        <!-- LANCER UNE ACTION -->
+        <div class="card">
+            <h2>🚀 Lancer une campagne d'action</h2>
+            <label>Nom de l'action :</label>
+            <input type="text" id="action-name" value="Tractage au marché">
+
+            <label>Date et Heure :</label>
+            <input type="text" id="action-date" value="ce samedi à 10h">
+
+            <button onclick="startCampaign()">Générer la file d'attente SMS</button>
+        </div>
+
+        <!-- FILE D'ATTENTE DES SMS -->
+        <div class="card" id="campaign-card" style="display:none;">
+            <h2>📋 File d'attente des envois</h2>
+            <p style="font-size: 0.85rem; color: var(--gray);">Clique sur "Envoyer", ton appli SMS s'ouvre, puis mets à jour le statut du militant.</p>
+            <div id="queue-container"></div>
+        </div>
+
+    </div>
+
+    <script>
+        // Données par défaut ou chargées depuis le stockage local du téléphone
+        let templates = JSON.parse(localStorage.getItem('m_templates')) || [
+            "Salut {prenom} ! Serais-tu dispo pour le/la {action} {date} ?",
+            "Hello {prenom} ! On organise un/une {action} {date}, tu seras des nôtres ?",
+            "Salut {prenom}, motivé(e) pour participer au/à la {action} {date} ?"
+        ];
+
+        let militants = JSON.parse(localStorage.getItem('m_militants')) || [
+            { name: "Thomas", phone: "0612345678" },
+            { name: "Sarah", phone: "0698765432" }
+        ];
+
+        let campaignQueue = [];
+
+        function saveData() {
+            localStorage.setItem('m_templates', JSON.stringify(templates));
+            localStorage.setItem('m_militants', JSON.stringify(militants));
+            renderUI();
+        }
+
+        function renderUI() {
+            // Rendu des templates
+            const tContainer = document.getElementById('templates-list');
+            tContainer.innerHTML = '';
+            templates.forEach((t, index) => {
+                tContainer.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; background:#f7fafc; padding:8px; border-radius:6px; margin-bottom:5px; font-size:0.9rem;">
+                        <span>"${t}"</span>
+                        <button class="delete-btn" onclick="deleteTemplate(${index})">❌</button>
+                    </div>`;
+            });
+
+            // Rendu des militants
+            const mContainer = document.getElementById('militants-ul');
+            mContainer.innerHTML = '';
+            militants.forEach((m, index) => {
+                mContainer.innerHTML += `
+                    <li class="list-group-item">
+                        <span><strong>${m.name}</strong> (${m.phone})</span>
+                        <button class="delete-btn" onclick="deleteMilitant(${index})">Supprimer</button>
+                    </li>`;
+            });
+        }
+
+        function addTemplate() {
+            const input = document.getElementById('new-template');
+            if(input.value.trim() !== '') {
+                templates.push(input.value.trim());
+                input.value = '';
+                saveData();
+            }
+        }
+
+        function deleteTemplate(index) {
+            templates.splice(index, 1);
+            saveData();
+        }
+
+        function addMilitant() {
+            const name = document.getElementById('m-name').value.trim();
+            const phone = document.getElementById('m-phone').value.trim();
+            if(name && phone) {
+                militants.push({ name, phone });
+                document.getElementById('m-name').value = '';
+                document.getElementById('m-phone').value = '';
+                saveData();
+            } else {
+                alert("Remplis le nom et le numéro !");
+            }
+        }
+
+        function deleteMilitant(index) {
+            militants.splice(index, 1);
+            saveData();
+        }
+
+        function startCampaign() {
+            if(militants.length === 0) {
+                alert("Ajoute d'abord des militants !");
+                return;
+            }
+            if(templates.length === 0) {
+                alert("Ajoute au moins un message type !");
+                return;
+            }
+
+            const actionName = document.getElementById('action-name').value;
+            const actionDate = document.getElementById('action-date').value;
+
+            // Préparation de la file avec un choix aléatoire de message pour chaque personne
+            campaignQueue = militants.map(m => {
+                const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
+                let msg = randomTemplate
+                    .replace(/{prenom}/g, m.name)
+                    .replace(/{action}/g, actionName)
+                    .replace(/{date}/g, actionDate);
+                
+                return {
+                    ...m,
+                    message: msg,
+                    status: 'En attente'
+                };
+            });
+
+            document.getElementById('campaign-card').style.display = 'block';
+            renderQueue();
+        }
+
+        function renderQueue() {
+            const container = document.getElementById('queue-container');
+            container.innerHTML = '';
+
+            campaignQueue.forEach((item, index) => {
+                let badgeClass = 'bg-warning';
+                if(item.status === 'Participe') badgeClass = 'bg-success';
+                if(item.status === 'Refus') badgeClass = 'bg-danger';
+
+                container.innerHTML += `
+                    <div class="sms-item">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <strong>${item.name} (${item.phone})</strong>
+                            <span class="tag ${badgeClass}">${item.status}</span>
+                        </div>
+                        <div class="message-preview">"${item.message}"</div>
+                        <div class="actions-flex">
+                            <a href="sms:${item.phone}?body=${encodeURIComponent(item.message)}" target="_blank" style="flex:1;">
+                                <button onclick="setStatus(${index}, 'Envoyé')">📲 Envoyer le SMS</button>
+                            </a>
+                        </div>
+                        <div style="display:flex; gap:5px; margin-top:8px;">
+                            <button onclick="setStatus(${index}, 'Participe')" class="btn-secondary" style="font-size:0.8rem; padding:6px; background:#38a169;">✅ Oui</button>
+                            <button onclick="setStatus(${index}, 'Refus')" class="btn-secondary" style="font-size:0.8rem; padding:6px; background:#e53e3e;">❌ Non</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function setStatus(index, status) {
+            campaignQueue[index].status = status;
+            renderQueue();
+        }
+
+        // Init au chargement
+        renderUI();
+    </script>
+</body>
+</html>
