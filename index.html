@@ -333,13 +333,12 @@
             reader.readAsText(file);
         }
 
-        // Import iCal optimisé via proxy CORS de secours
+        // Import iCal mis à jour avec AllOrigins
         function importGoogleCalendar() {
             const url = document.getElementById('ical-url').value.trim();
             if(!url) { alert("Entre un lien iCal valide."); return; }
             
-            // Utilisation d'un proxy CORS alternatif et plus stable (corsproxy.io)
-            const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
 
             fetch(proxyUrl)
                 .then(response => {
@@ -379,7 +378,7 @@
                     }
                 }
             }
-            return events.slice(0, 10); // Garde les 10 prochains événements
+            return events.slice(0, 10);
         }
 
         function formatICSDate(str) {
@@ -444,7 +443,6 @@
             const container = document.getElementById('queue-container');
             container.innerHTML = '';
 
-            campaignQueue.layers?.forEach // sécurité
             campaignQueue.forEach((item, index) => {
                 let badgeClass = 'bg-warning';
                 if(item.status === 'Participe') badgeClass = 'bg-success';
