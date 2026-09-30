@@ -512,7 +512,14 @@
 
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            auth.signInWithPopup(provider).catch((error) => {
+            auth.signInWithPopup(provider).then((result) => {
+                const user = result.user;
+                // Sécurité : Seul cet email est autorisé à accéder à l'application
+                if (user.email !== "insoumisud77@gmail.com") {
+                    alert("Accès refusé : ce compte Google n'est pas autorisé.");
+                    auth.signOut(); // Déconnexion immédiate
+                }
+            }).catch((error) => {
                 alert("Erreur de connexion : " + error.message);
             });
         }
