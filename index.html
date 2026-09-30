@@ -215,7 +215,7 @@
         <!-- CONFIGURATION DES MESSAGES TYPES -->
         <div class="card">
             <h2>💬 Messages Types par Catégorie</h2>
-            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong>. <br>Astuce : utilise <strong>{un_une}</strong> ou <strong>{le_la}</strong> pour que l'appli choisisse toute seule !</p>
+            <p style="font-size:0.8rem; color:var(--gray); margin-top:0;">Balises disponibles : <strong>{prenom}</strong>, <strong>{action}</strong>, <strong>{date}</strong>, <strong>{lieu}</strong></p>
             <div style="margin-bottom: 15px;">
                 <label>Catégorie :</label>
                 <select id="template-cat" style="background:#fff;">
@@ -224,7 +224,7 @@
                     <option value="reminder2">Relance 2</option>
                     <option value="rapel">Rappel (Veille d'événement)</option>
                 </select>
-                <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, dispo pour {un_une} {action} le {date} ?" style="margin-bottom:10px;">
+                <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, dispo pour {action} le {date} ? Rdv {lieu}" style="margin-bottom:10px;">
                 <button onclick="addTemplate()" class="btn-secondary" style="padding: 8px;">Ajouter à la catégorie</button>
             </div>
             <div id="templates-list-grouped"></div>
@@ -272,8 +272,8 @@
         const db = firebase.database();
 
         let templates = {
-            first: ["Salut {prenom}, dispo pour {un_une} {action} le {date} ? Rdv {lieu}"],
-            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens à {le_la} {action} le {date} ?"],
+            first: ["Salut {prenom}, dispo pour {action} le {date} ? Rdv {lieu}"],
+            reminder1: ["Hello {prenom}, un petit mot pour savoir si tu viens à {action} le {date} ?"],
             reminder2: ["Salut {prenom} ! On compte sur toi pour {action} le {date}, tu confirmes ta présence ?"],
             rapel: ["Rappel {prenom} : On se retrouve pour {action} le {date} à {lieu}. À très vite !"]
         };
@@ -380,7 +380,7 @@
         function renderCalendarEvents() {
             const container = document.getElementById('calendar-events-container');
             if(!calendarEvents || calendarEvents.length === 0) {
-                container.innerHTML = '<p style="font-size:0.85rem; color:var(--gray);">Aucun événement dans l\'agenda.</p>';
+                container.innerHTML = '<p style="font-size:0.85rem; color: var(--gray);">Aucun événement dans l\'agenda.</p>';
                 return;
             }
 
@@ -455,6 +455,19 @@
             }
             document.getElementById('campaigns-card').style.display = 'block';
             window.scrollTo({ top: document.getElementById('campaigns-card').offsetTop - 50, behavior: 'smooth' });
+        }
+
+        function updateCampaignDetails(eventId) {
+            const newName = document.getElementById(`camp_name_${eventId}`).value.trim();
+            const newDate = document.getElementById(`camp_date_${eventId}`).value.trim();
+            const newLocation = document.getElementById(`camp_loc_${eventId}`).value.trim();
+
+            if(campaigns[eventId]) {
+                campaigns[eventId].name = newName || campaigns[eventId].name;
+                campaigns[eventId].date = newDate || campaigns[eventId].date;
+                campaigns[eventId].location = newLocation;
+                saveData();
+            }
         }
 
         function renderCampaigns() {
@@ -560,10 +573,26 @@
                 container.innerHTML += `
                     <div style="background:#fff; border:1px solid #cbd5e0; border-radius:8px; padding:15px; margin-bottom:15px;">
                         <h3 style="margin-top:0; color:var(--primary-dark); display:flex; justify-content:space-between; align-items:center;">
-                            <span>${camp.name}</span>
+                            <span>Campagne en cours</span>
                             <button onclick="deleteCampaign('${eventId}')" class="delete-btn" style="font-size:0.8rem;">Supprimer campagne</button>
                         </h3>
-                        <div style="font-size:0.85rem; color:var(--gray); margin-bottom:10px;">📅 ${camp.date} | 📍 ${camp.location || 'Lieu non spécifié'}</div>
+
+                        <!-- Champs modifiables directement -->
+                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 12px;">
+                            <label style="font-size:0.75rem; color:var(--gray);">Modifier le titre de l'action (pour les SMS) :</label>
+                            <input type="text" id="camp_name_${eventId}" value="${camp.name}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:8px; font-size:0.9rem; background:#fff;">
+                            
+                            <div style="display:flex; gap:10px;">
+                                <div style="flex:1;">
+                                    <label style="font-size:0.75rem; color:var(--gray);">Date / Heure :</label>
+                                    <input type="text" id="camp_date_${eventId}" value="${camp.date}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                                </div>
+                                <div style="flex:1;">
+                                    <label style="font-size:0.75rem; color:var(--gray);">Lieu :</label>
+                                    <input type="text" id="camp_loc_${eventId}" value="${camp.location || ''}" oninput="updateCampaignDetails('${eventId}')" style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                                </div>
+                            </div>
+                        </div>
                         
                         <div style="margin-bottom:12px;">
                             <span class="stats-badge" style="background:#e6fffa; color:#00796b;">✅ Oui : ${stats.oui}</span>
@@ -610,40 +639,11 @@
             const camp = campaigns[eventId];
             const item = camp.queue[index];
 
-            let actionName = camp.name;
-            let firstChar = actionName.trim().charAt(0).toLowerCase();
-            let isVowel = ['a', 'e', 'i', 'o', 'u', 'y', 'h', 'é', 'è', 'ê'].includes(firstChar);
-
-            // Gestion automatique des articles un/une, le/la
-            let unUne = isVowel ? "un" : (actionName.toLowerCase().startsWith("assemblée") || actionName.toLowerCase().startsWith("réunion") || actionName.toLowerCase().startsWith("manifestation") ? "une" : "un");
-            // Ajustement plus fin : si le mot commence par une voyelle, souvent c'est "un" mais avec élision. Ici on simplifie :
-            let unUneForm = isVowel ? "d'" + actionName : unUne + " " + actionName;
-            
-            // Articles définis (le/la vs l')
-            let leLa = isVowel ? "l'" + actionName : "le " + actionName;
-
             let msg = randomTpl
                 .replace(/{prenom}/g, item.name)
-                .replace(/{action}/g, actionName)
-                .replace(/{un_une}/g, isVowel ? "un" : "un") // ou gère dynamiquement selon la formulation
-                .replace(/{le_la}/g, leLa)
+                .replace(/{action}/g, camp.name)
                 .replace(/{date}/g, camp.date)
-                .replace(/{lieu}/g, camp.location || "le lieu habituel");
-
-            // Option simple et magique pour {un_une} et {le_la} :
-            msg = msg.replace(/un_une/g, isVowel ? "d'" : "un ");
-            
-            // Logique propre d'accord automatique
-            let articleUnUne = isVowel ? "d'" : "un ";
-            let articleLeLa = isVowel ? "l'" : "le ";
-            
-            msg = randomTpl
-                .replace(/{prenom}/g, item.name)
-                .replace(/{action}/g, actionName)
-                .replace(/{un_une}/g, isVowel ? "d'" : "un")
-                .replace(/{le_la}/g, isVowel ? "l'" : "le")
-                .replace(/{date}/g, camp.date)
-                .replace(/{lieu}/g, camp.location || "le lieu habituel");
+                .replace(/{lieu}/g, camp.location || "sur place");
 
             campaigns[eventId].queue[index].message = msg;
             saveData();
