@@ -37,14 +37,15 @@ async function sync() {
         }
     }
 
+    // Tri chronologique global (du plus ancien au plus lointain)
     events.sort((a, b) => a.timestamp - b.timestamp);
-    const upcomingEvents = events.slice(0, 30);
 
-    console.log(`Envoi de ${upcomingEvents.length} événements vers Firebase...`);
+    console.log(`Envoi de ${events.length} événements vers Firebase...`);
     
+    // On envoie tout sans couper avec slice() pour ne rater ni le passé ni le futur
     await fetch(`${dbUrl}/calendarEvents.json`, {
         method: 'PUT',
-        body: JSON.stringify(upcomingEvents),
+        body: JSON.stringify(events),
         headers: { 'Content-Type': 'application/json' }
     });
 
