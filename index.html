@@ -13,13 +13,13 @@
     
     <!-- Manifeste PWA -->
     <link rel="manifest" href="data:application/manifest+json;charset=utf-8,{
-      'name': 'SMS Militants',
-      'short_name': 'SMS Militants',
-      'start_url': '.',
-      'display': 'standalone',
-      'background_color': '#f4f6f9',
-      'theme_color': '#e53935',
-      'icons': [{ 'src': 'app-icon.png', 'sizes': '512x512', 'type': 'image/png' }]
+      &quot;name&quot;: &quot;SMS Militants&quot;,
+      &quot;short_name&quot;: &quot;SMS Militants&quot;,
+      &quot;start_url&quot;: &quot;.&quot;,
+      &quot;display&quot;: &quot;standalone&quot;,
+      &quot;background_color&quot;: &quot;#f4f6f9&quot;,
+      &quot;theme_color&quot;: &quot;#e53935&quot;,
+      &quot;icons&quot;: [{ &quot;src&quot;: &quot;app-icon.png&quot;, &quot;sizes&quot;: &quot;512x512&quot;, &quot;type&quot;: &quot;image/png&quot; }]
     }">
 
     <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
@@ -296,7 +296,7 @@
         <div class="card" style="text-align:center; max-width:400px; width:90%; padding:30px;">
             <img src="app-icon.png" alt="Logo" style="width:80px; height:80px; border-radius:16px; margin-bottom:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
             <h2 style="color:var(--primary-dark); margin-bottom:10px;">SMS Militants</h2>
-            <p style="font-size:0.9rem; color:var(--gray); margin-bottom:25px;">Connectez-vous avec votre compte Google autorisé pour accéder à l'application.</p>
+            <p style="font-size:0.9rem; color:var(--gray); margin-bottom:25px;">Connectez-vous avec le compte Google autorisé pour accéder à l'application.</p>
             <button onclick="loginWithGoogle()" style="background:#4285F4; display:flex; align-items:center; justify-content:center; gap:10px; padding:12px; font-size:1rem;">
                 <span style="background:white; color:#4285F4; padding:4px 8px; border-radius:4px; font-weight:bold;">G</span> Se connecter avec Google
             </button>
@@ -416,6 +416,15 @@
                     <input type="text" id="new-template" placeholder="Ex: Salut {prenom}, rdv ce soir pour {action} !" style="margin-bottom:10px;">
                     <button onclick="addTemplate()" class="btn-secondary" style="padding: 8px;">Ajouter le message</button>
                 </div>
+
+                <div style="background: #fffaf0; padding: 12px; border-radius: 8px; border: 1px solid #feebc8; margin-bottom: 15px;">
+                    <label style="font-size:0.85rem; color:#c05621;">✨ Clé API Gemini (stockée uniquement sur cet appareil) :</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="password" id="gemini-api-key" placeholder="Colle ta clé API Gemini ici..." style="margin-bottom:0; font-size:0.85rem; background:#fff;">
+                        <button onclick="saveGeminiKey()" class="btn-secondary" style="width:auto; padding:8px 12px; font-size:0.85rem; background:var(--info);">Enregistrer</button>
+                    </div>
+                </div>
+
                 <div id="templates-list-grouped"></div>
             </div>
         </div>
@@ -484,6 +493,8 @@
     </div>
 
     <script>
+        const ALLOWED_EMAIL = "insoumisud77@gmail.com";
+
         const firebaseConfig = {
             apiKey: "AIzaSyCRWuB4zYxG5aKsrSFh2F0Uow51SzB0bZQ",
             authDomain: "sms-militants.firebaseapp.com",
@@ -499,12 +510,21 @@
         const db = firebase.database();
         const auth = firebase.auth();
 
-        // Gestion de l'authentification Google
+        let appDataInitialized = false;
+
         auth.onAuthStateChanged((user) => {
             const loginOverlay = document.getElementById('login-overlay');
             if (user) {
+                if (user.email !== ALLOWED_EMAIL) {
+                    alert("Accès refusé : ce compte Google n'est pas autorisé.");
+                    auth.signOut();
+                    return;
+                }
                 loginOverlay.style.display = 'none';
-                initAppData();
+                if (!appDataInitialized) {
+                    appDataInitialized = true;
+                    initAppData();
+                }
             } else {
                 loginOverlay.style.display = 'flex';
             }
@@ -513,11 +533,9 @@
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
             auth.signInWithPopup(provider).then((result) => {
-                const user = result.user;
-                // Sécurité : Seul cet email est autorisé à accéder à l'application
-                if (user.email !== "insoumisud77@gmail.com") {
+                if (result.user && result.user.email !== ALLOWED_EMAIL) {
                     alert("Accès refusé : ce compte Google n'est pas autorisé.");
-                    auth.signOut(); // Déconnexion immédiate
+                    auth.signOut();
                 }
             }).catch((error) => {
                 alert("Erreur de connexion : " + error.message);
@@ -526,6 +544,49 @@
 
         function logout() {
             auth.signOut();
+        }
+
+        function getGeminiKey() {
+            return localStorage.getItem('sms_militants_gemini_key') || '';
+        }
+
+        function saveGeminiKey() {
+            const val = document.getElementById('gemini-api-key').value.trim();
+            localStorage.setItem('sms_militants_gemini_key', val);
+            alert(val ? "Clé API enregistrée sur cet appareil." : "Clé API effacée.");
+        }
+
+        async function polishSmsWithAI(rawMessage, contextInfo) {
+            const apiKey = getGeminiKey();
+            if (!apiKey) {
+                alert("Ajoute d'abord ta clé API Gemini dans l'onglet 'Messages Types'. Le message brut a été gardé.");
+                return rawMessage;
+            }
+
+            const prompt = `Tu es un assistant de rédaction de SMS courts en français pour une campagne militante.
+Corrige uniquement la syntaxe, les accords, les prépositions (ex: "à la", "au", "chez", "salle...", "centre commercial...") et la fluidité des dates/lieux dans ce SMS, sans changer le sens ni ajouter d'informations absentes.
+Réponds UNIQUEMENT avec le texte final du SMS, sans guillemets ni explication.
+
+Infos de contexte : ${JSON.stringify(contextInfo)}
+SMS à corriger : ${rawMessage}`;
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }]
+                    })
+                });
+                if (!res.ok) throw new Error("Erreur HTTP " + res.status);
+                const data = await res.json();
+                const polished = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                return polished || rawMessage;
+            } catch (e) {
+                console.error("Erreur IA:", e);
+                alert("Impossible de contacter l'IA pour le moment (" + e.message + "). Le message brut est conservé.");
+                return rawMessage;
+            }
         }
 
         let templates = {
@@ -553,6 +614,9 @@
         let modalCachedEventData = null;
 
         function initAppData() {
+            const keyInput = document.getElementById('gemini-api-key');
+            if (keyInput) keyInput.value = getGeminiKey();
+
             db.ref('templates').on('value', (snap) => { 
                 if(snap.val()) { 
                     let data = snap.val();
@@ -917,7 +981,7 @@
                         status: 'À contacter',
                         sentAt: null,
                         lastSentTimestamp: null,
-                        history: [] // Historique des SMS envoyés
+                        history: []
                     });
                 }
             });
@@ -975,6 +1039,63 @@
             renderCampaigns();
         }
 
+        function renderMilitantCardHtml(eventId, item, realIndex) {
+            let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
+            let displayStatus = item.status;
+            const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
+            const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
+            const cityStr = item.city ? ` (${item.city})` : '';
+
+            let historyList = item.history || [];
+            if(item.sentAt && historyList.length === 0) {
+                historyList.push({ date: item.sentAt, message: item.message || "" });
+            }
+            let historyHtml = '';
+            if(historyList.length > 0) {
+                historyHtml = `<div style="margin-top:6px; background:#edf2f7; padding:6px; border-radius:4px; font-size:0.75rem;">
+                    <strong>📜 Historique des envois (${historyList.length}) :</strong>
+                    <ul style="margin:2px 0 0 15px; padding:0;">`;
+                historyList.forEach(h => {
+                    historyHtml += `<li><em>${h.date}</em> : "${h.message}"</li>`;
+                });
+                historyHtml += `</ul></div>`;
+            } else {
+                historyHtml = `<div style="margin-top:6px; font-size:0.75rem; color:var(--gray);">🕒 Aucun SMS envoyé pour le moment.</div>`;
+            }
+
+            let templateOptions = '';
+            for (let cat in templates) {
+                let cLabel = templates[cat]?.label || cat;
+                templateOptions += `<option value="${cat}">${cLabel}</option>`;
+            }
+
+            return `
+                <div class="sms-item">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
+                        <div style="display:flex; align-items:center; gap:5px;">
+                            <span class="tag ${badgeClass}">${displayStatus}</span>
+                            <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
+                        </div>
+                    </div>
+                    <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
+                    <div style="display:flex; gap:5px; margin-bottom:8px;">
+                        <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
+                        <button onclick="generateMessage('${eventId}', ${realIndex}, false)" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
+                        <button onclick="generateMessage('${eventId}', ${realIndex}, true)" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem; background:#6b46c1;">✨ IA</button>
+                    </div>
+                    ${historyHtml}
+                    <div class="actions-flex" style="margin-top:8px;"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
+                    <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                        <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
+                        <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
+                        <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
+                        <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
+                        <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
+                    </div>
+                </div>`;
+        }
+
         function updateCampaignSearch(eventId, val) {
             campaignSearches[eventId] = val;
             let queueContainer = document.getElementById(`queue_container_${eventId}`);
@@ -1013,61 +1134,7 @@
             let queueHtml = '';
             filteredQueue.forEach((item) => {
                 let realIndex = queueList.indexOf(item);
-                let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                let displayStatus = item.status;
-                const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
-                const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
-                const cityStr = item.city ? ` (${item.city})` : '';
-
-                // Construction de l'historique des SMS pour ce militant
-                let historyList = item.history || [];
-                if(item.sentAt && historyList.length === 0) {
-                    // Rétrocompatibilité avec les anciens envois
-                    historyList.push({ date: item.sentAt, message: item.message || "" });
-                }
-                let historyHtml = '';
-                if(historyList.length > 0) {
-                    historyHtml = `<div style="margin-top:6px; background:#edf2f7; padding:6px; border-radius:4px; font-size:0.75rem;">
-                        <strong>📜 Historique des envois (${historyList.length}) :</strong>
-                        <ul style="margin:2px 0 0 15px; padding:0;">`;
-                    historyList.forEach(h => {
-                        historyHtml += `<li><em>${h.date}</em> : "${h.message}"</li>`;
-                    });
-                    historyHtml += `</ul></div>`;
-                } else {
-                    historyHtml = `<div style="margin-top:6px; font-size:0.75rem; color:var(--gray);">🕒 Aucun SMS envoyé pour le moment.</div>`;
-                }
-
-                let templateOptions = '';
-                for (let cat in templates) {
-                    let cLabel = templates[cat]?.label || cat;
-                    templateOptions += `<option value="${cat}">${cLabel}</option>`;
-                }
-
-                queueHtml += `
-                    <div class="sms-item">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
-                            <div style="display:flex; align-items:center; gap:5px;">
-                                <span class="tag ${badgeClass}">${displayStatus}</span>
-                                <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
-                            </div>
-                        </div>
-                        <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
-                        <div style="display:flex; gap:5px; margin-bottom:8px;">
-                            <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
-                            <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
-                        </div>
-                        ${historyHtml}
-                        <div class="actions-flex" style="margin-top:8px;"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
-                        <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
-                            <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
-                            <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
-                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
-                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
-                            <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
-                        </div>
-                    </div>`;
+                queueHtml += renderMilitantCardHtml(eventId, item, realIndex);
             });
 
             queueContainer.innerHTML = queueHtml || '<p style="font-size:0.85rem; color:var(--gray);">Aucun militant ne correspond à la recherche/filtre.</p>';
@@ -1158,59 +1225,7 @@
                 if(isExpanded) {
                     filteredQueue.forEach((item) => {
                         let realIndex = queueList.indexOf(item);
-                        let badgeClass = item.status === 'Participe' ? 'bg-success' : (item.status === 'Refus' ? 'bg-danger' : (item.status === 'Peut-être' ? 'bg-purple' : (item.status === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
-                        let displayStatus = item.status;
-                        const fullName = item.lastname ? `${item.name} ${item.lastname}` : item.name;
-                        const compTag = item.company ? ` <span class="tag bg-info">${item.company}</span>` : '';
-                        const cityStr = item.city ? ` (${item.city})` : '';
-
-                        let historyList = item.history || [];
-                        if(item.sentAt && historyList.length === 0) {
-                            historyList.push({ date: item.sentAt, message: item.message || "" });
-                        }
-                        let historyHtml = '';
-                        if(historyList.length > 0) {
-                            historyHtml = `<div style="margin-top:6px; background:#edf2f7; padding:6px; border-radius:4px; font-size:0.75rem;">
-                                <strong>📜 Historique des envois (${historyList.length}) :</strong>
-                                <ul style="margin:2px 0 0 15px; padding:0;">`;
-                            historyList.forEach(h => {
-                                historyHtml += `<li><em>${h.date}</em> : "${h.message}"</li>`;
-                            });
-                            historyHtml += `</ul></div>`;
-                        } else {
-                            historyHtml = `<div style="margin-top:6px; font-size:0.75rem; color:var(--gray);">🕒 Aucun SMS envoyé pour le moment.</div>`;
-                        }
-
-                        let templateOptions = '';
-                        for (let cat in templates) {
-                            let cLabel = templates[cat]?.label || cat;
-                            templateOptions += `<option value="${cat}">${cLabel}</option>`;
-                        }
-
-                        queueHtml += `
-                            <div class="sms-item">
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <div><strong>${fullName}</strong>${compTag}${cityStr} <span style="color:var(--gray);">(${item.phone})</span></div>
-                                    <div style="display:flex; align-items:center; gap:5px;">
-                                        <span class="tag ${badgeClass}">${displayStatus}</span>
-                                        <button class="delete-btn" onclick="removeMilitantFromCampaign('${eventId}', ${realIndex})" title="Retirer de la campagne" style="font-size:0.7rem;">❌</button>
-                                    </div>
-                                </div>
-                                <div class="message-preview">"${item.message || '(Aucun message généré)'}"</div>
-                                <div style="display:flex; gap:5px; margin-bottom:8px;">
-                                    <select id="cat_select_${eventId}_${realIndex}" style="margin-bottom:0; font-size:0.8rem; background:#fff;">${templateOptions}</select>
-                                    <button onclick="generateMessage('${eventId}', ${realIndex})" class="btn-secondary" style="width:auto; padding:6px 10px; font-size:0.8rem;">Générer</button>
-                                </div>
-                                ${historyHtml}
-                                <div class="actions-flex" style="margin-top:8px;"><a href="sms:${item.phone}?body=${encodeURIComponent(item.message || '')}" target="_blank" style="flex:1;" onclick="markAsSent('${eventId}', ${realIndex})"><button>📲 Envoyer le SMS</button></a></div>
-                                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'À contacter')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#4a5568;">🔄 À contacter</button>
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'En attente de réponse')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#d69e2e;">⏳ En attente</button>
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Peut-être')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#805ad5;">🤔 Peut-être</button>
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Participe')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#38a169;">✅ Oui</button>
-                                    <button onclick="setStatus('${eventId}', ${realIndex}, 'Refus')" class="btn-secondary" style="font-size:0.7rem; padding:4px; background:#e53e3e;">❌ Non</button>
-                                </div>
-                            </div>`;
+                        queueHtml += renderMilitantCardHtml(eventId, item, realIndex);
                     });
                 }
 
@@ -1280,7 +1295,7 @@
             }
         }
 
-        function generateMessage(eventId, index) {
+        async function generateMessage(eventId, index, useAI = false) {
             const select = document.getElementById(`cat_select_${eventId}_${index}`);
             const list = templates[select.value]?.list || [];
             if(!list.length) { alert("Aucun message dans cette catégorie !"); return; }
@@ -1288,12 +1303,24 @@
             const camp = campaigns[eventId];
             const item = camp.queue[index];
 
-            campaigns[eventId].queue[index].message = randomTpl
+            let msg = randomTpl
                 .replace(/{prenom}/g, item.name)
                 .replace(/{action}/g, camp.name)
                 .replace(/{date}/g, camp.date)
                 .replace(/{lieu}/g, camp.location || "sur place");
-            saveData(); renderCampaigns();
+
+            if (useAI) {
+                msg = await polishSmsWithAI(msg, {
+                    prenom: item.name,
+                    action: camp.name,
+                    date: camp.date,
+                    lieu: camp.location || ""
+                });
+            }
+
+            campaigns[eventId].queue[index].message = msg;
+            saveData();
+            renderCampaigns();
         }
 
         function markAsSent(eventId, index) {
@@ -1521,7 +1548,6 @@
 
                                     let badgeClass = st === 'Participe' ? 'bg-success' : (st === 'Refus' ? 'bg-danger' : (st === 'Peut-être' ? 'bg-purple' : (st === 'En attente de réponse' ? 'bg-warning' : 'bg-info')));
                                     
-                                    // Affichage détaillé de l'historique dans le profil
                                     let historyDetails = "";
                                     let hList = item.history || [];
                                     if(hList.length > 0) {
